@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 /* ─── SVG Bar Chart ─── */
 function BarChart({ configs }) {
@@ -160,7 +161,7 @@ export default function Dashboard() {
 
     const load = () => {
         setLoading(true);
-        axios.get('http://localhost:5000/api/configurations/stats')
+        axios.get(`${API_URL}/api/configurations/stats`)
             .then(r => { setStats(r.data); setLoading(false); })
             .catch(() => setLoading(false));
     };

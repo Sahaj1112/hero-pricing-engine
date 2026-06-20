@@ -11,12 +11,14 @@ const ThemeToggle = () => {
         else setTheme('system');
     };
 
+    
     const getIcon = () => {
         if (theme === 'system') return '💻';
         if (theme === 'light') return '☀️';
         return '🌙';
     };
 
+    
     return (
         <button className="theme-toggle-btn" onClick={cycleTheme} title={`Current theme: ${theme}`}>
             {getIcon()}

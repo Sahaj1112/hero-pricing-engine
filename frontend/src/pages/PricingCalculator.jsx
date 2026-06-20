@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 /* ─── Category definitions (keys match DB category column) ─── */
 const CATEGORIES = [
@@ -91,7 +92,7 @@ export default function PricingCalculator() {
     const [flash,      setFlash]      = useState(false);
 
     useEffect(() => {
-        axios.get('http://localhost:5000/api/parts').then(r => setParts(r.data));
+        axios.get(`${API_URL}/api/parts`).then(r => setParts(r.data));
     }, []);
 
     const select = (catKey, part) => {

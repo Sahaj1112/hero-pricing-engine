@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 const CATEGORIES = [
     { key: 'frame',     label: 'Frame',     icon: '🔩' },
@@ -148,7 +149,7 @@ function NewConfigModal({ parts, onClose, onSaved }) {
         setSaving(true);
         setApiError('');
         try {
-            await axios.post('http://localhost:5000/api/configurations', {
+            await axios.post(`${API_URL}/api/configurations`, {
                 name: name.trim(),
                 description: desc,
                 part_ids: Object.values(selections).filter(Boolean),
@@ -301,8 +302,8 @@ export default function ConfigBuilder() {
     const navigate = useNavigate();
 
     const loadData = () => {
-        axios.get('http://localhost:5000/api/parts').then(r => setParts(r.data));
-        axios.get('http://localhost:5000/api/configurations').then(r => setConfigs(r.data));
+        axios.get(`${API_URL}/api/parts`).then(r => setParts(r.data));
+        axios.get(`${API_URL}/api/configurations`).then(r => setConfigs(r.data));
     };
 
     useEffect(() => { loadData(); }, []);

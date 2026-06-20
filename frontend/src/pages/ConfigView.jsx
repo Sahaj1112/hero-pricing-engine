@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 export default function ConfigView() {
     const { id } = useParams();
@@ -8,7 +9,7 @@ export default function ConfigView() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        axios.get(`http://localhost:5000/api/configurations/${id}`).then(r => setConfig(r.data));
+        axios.get(`${API_URL}/api/configurations/${id}`).then(r => setConfig(r.data));
     }, [id]);
 
     if (!config) return (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 const CATEGORIES = ['frame', 'gear', 'tyre', 'accessory'];
 const PAGE_SIZE = 10;
@@ -63,9 +64,9 @@ function PartFormModal({ initial, onClose, onSaved }) {
         setSaving(true);
         try {
             if (isEdit) {
-                await axios.put(`http://localhost:5000/api/parts/${initial.id}`, form);
+                await axios.put(`${API_URL}/api/parts/${initial.id}`, form);
             } else {
-                await axios.post('http://localhost:5000/api/parts', form);
+                await axios.post(`${API_URL}/api/parts`, form);
             }
             onSaved(isEdit ? 'Part updated successfully!' : 'Part added successfully!');
         } catch {
@@ -143,7 +144,7 @@ function DeleteModal({ part, onClose, onDeleted }) {
     const confirm = async () => {
         setDeleting(true);
         try {
-            await axios.delete(`http://localhost:5000/api/parts/${part.id}`);
+            await axios.delete(`${API_URL}/api/parts/${part.id}`);
             onDeleted('Part deleted successfully.');
         } catch {
             onClose();
@@ -180,7 +181,7 @@ export default function Parts() {
     const [editPart, setEditPart] = useState(null);
     const [deletePart, setDeletePart] = useState(null);
 
-    const load = () => axios.get('http://localhost:5000/api/parts').then(r => setParts(r.data));
+    const load = () => axios.get(`${API_URL}/api/parts`).then(r => setParts(r.data));
     useEffect(() => { load(); }, []);
 
     const showToast = (msg) => {
