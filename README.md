@@ -106,7 +106,7 @@ hero-pricing-engine/
         ├── config/
         │   └── api.js        # API base URL (VITE_API_URL)
         ├── components/       # Navbar, Sidebar
-        ├── context/          # Theme context
+
         └── pages/            # Landing, Login, Dashboard, Parts, etc.
 ```
 
