@@ -697,6 +697,7 @@ export default function ConfigBuilder() {
     const [pagination, setPagination] = useState(null);
     const [configPage, setConfigPage] = useState(1);
     const [configSearch, setConfigSearch] = useState('');
+    const debouncedConfigSearch = useDebounce(configSearch);
     const [loading, setLoading] = useState(true);
     const [refresh, setRefresh] = useState(0);
     const [modalOpen, setModalOpen] = useState(false);
@@ -709,7 +710,7 @@ export default function ConfigBuilder() {
         setLoading(true);
         try {
             const params = { page: configPage, limit: PAGE_SIZE };
-            if (configSearch) params.search = configSearch;
+            if (debouncedConfigSearch) params.search = debouncedConfigSearch;
 
             const res = await axios.get(`${API_URL}/api/configurations`, { params });
             setConfigs(res.data.data);
@@ -720,7 +721,7 @@ export default function ConfigBuilder() {
         } finally {
             setLoading(false);
         }
-    }, [configPage, configSearch]);
+    }, [configPage, debouncedConfigSearch]);
 
     useEffect(() => { loadConfigs(); }, [loadConfigs, refresh]);
 
@@ -747,7 +748,7 @@ export default function ConfigBuilder() {
     const handleConfigSearch = (val) => { setConfigSearch(val); setConfigPage(1); };
 
     const totalRecords = pagination?.totalRecords ?? 0;
-    const isEmpty = !loading && totalRecords === 0 && !configSearch;
+    const isEmpty = !loading && totalRecords === 0 && !debouncedConfigSearch;
 
     return (
         <div className="page-wrapper animate-fade-in">

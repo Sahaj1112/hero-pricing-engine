@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config/api';
 import Pagination from '../components/Pagination';
+import useDebounce from '../hooks/useDebounce';
 
 const CATEGORIES = ['frame', 'gear', 'tyre', 'accessory'];
 const PAGE_SIZE = 10;
@@ -159,6 +160,7 @@ export default function Parts() {
     const [editPart, setEditPart] = useState(null);
     const [deletePart, setDeletePart] = useState(null);
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebounce(search);
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [refresh, setRefresh] = useState(0);
 
@@ -166,7 +168,7 @@ export default function Parts() {
         setLoading(true);
         try {
             const params = { page, limit: PAGE_SIZE };
-            if (search) params.search = search;
+            if (debouncedSearch) params.search = debouncedSearch;
             if (categoryFilter !== 'all') params.category = categoryFilter;
 
             const res = await axios.get(`${API_URL}/api/parts`, { params });
@@ -178,7 +180,7 @@ export default function Parts() {
         } finally {
             setLoading(false);
         }
-    }, [page, search, categoryFilter]);
+    }, [page, debouncedSearch, categoryFilter]);
 
     useEffect(() => { load(); }, [load, refresh]);
 
