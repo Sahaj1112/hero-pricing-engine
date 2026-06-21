@@ -191,6 +191,8 @@ export default function Parts() {
     const [addOpen, setAddOpen] = useState(false);
     const [editPart, setEditPart] = useState(null);
     const [deletePart, setDeletePart] = useState(null);
+    const [search, setSearch] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
 
     const load = () => axios.get(`${API_URL}/api/parts`).then(r => setParts(r.data));
     useEffect(() => { load(); }, []);
@@ -214,7 +216,17 @@ export default function Parts() {
         showToast(msg);
     };
 
-    const paged = parts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    // Derived filtered list
+    const filtered = parts.filter(p => {
+        const matchName = p.name.toLowerCase().includes(search.toLowerCase());
+        const matchCat  = categoryFilter === 'all' || p.category === categoryFilter;
+        return matchName && matchCat;
+    });
+
+    const handleSearch = (val) => { setSearch(val); setPage(1); };
+    const handleCategoryFilter = (val) => { setCategoryFilter(val); setPage(1); };
+
+    const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
     return (
         <div className="page-wrapper animate-fade-in">
@@ -232,6 +244,39 @@ export default function Parts() {
                 <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>
                     + Add New Part
                 </button>
+            </div>
+
+            {/* Search & Filter Toolbar */}
+            <div className="table-toolbar">
+                <div className="table-toolbar-search">
+                    <span className="table-toolbar-icon">🔍</span>
+                    <input
+                        id="parts-search-input"
+                        className="table-toolbar-input"
+                        placeholder="Search parts by name…"
+                        value={search}
+                        onChange={e => handleSearch(e.target.value)}
+                    />
+                    {search && (
+                        <button className="table-toolbar-clear" onClick={() => handleSearch('')} aria-label="Clear search">✕</button>
+                    )}
+                </div>
+                <select
+                    id="parts-category-filter"
+                    className="table-toolbar-select"
+                    value={categoryFilter}
+                    onChange={e => handleCategoryFilter(e.target.value)}
+                >
+                    <option value="all">All Categories</option>
+                    {CATEGORIES.map(c => (
+                        <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                    ))}
+                </select>
+                {(search || categoryFilter !== 'all') && (
+                    <span className="table-toolbar-count">
+                        {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+                    </span>
+                )}
             </div>
 
             {/* Table */}
@@ -265,16 +310,18 @@ export default function Parts() {
                                 </td>
                             </tr>
                         ))}
-                        {parts.length === 0 && (
+                        {filtered.length === 0 && (
                             <tr>
                                 <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                                    No parts yet. Click <strong>"+ Add New Part"</strong> to get started.
+                                    {parts.length === 0
+                                        ? <>No parts yet. Click <strong>"+ Add New Part"</strong> to get started.</>
+                                        : <>No parts match your search. <button className="btn-link" onClick={() => { handleSearch(''); handleCategoryFilter('all'); }}>Clear filters</button></>}
                                 </td>
                             </tr>
                         )}
                     </tbody>
                 </table>
-                <Pagination total={parts.length} page={page} onPage={setPage} />
+                <Pagination total={filtered.length} page={page} onPage={setPage} />
             </div>
 
             {/* Modals */}

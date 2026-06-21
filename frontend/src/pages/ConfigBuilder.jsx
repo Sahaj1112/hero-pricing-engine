@@ -668,6 +668,8 @@ export default function ConfigBuilder() {
     const [toast, setToast] = useState('');
     const navigate = useNavigate();
 
+    const [configSearch, setConfigSearch] = useState('');
+
     const loadData = () => {
         axios.get(`${API_URL}/api/parts`).then(r => setParts(r.data));
         axios.get(`${API_URL}/api/configurations`).then(r => setConfigs(r.data));
@@ -695,7 +697,14 @@ export default function ConfigBuilder() {
         showToast(msg);
     };
 
-    const pagedConfigs = configs.slice((configPage - 1) * PAGE_SIZE, configPage * PAGE_SIZE);
+    const handleConfigSearch = (val) => { setConfigSearch(val); setConfigPage(1); };
+
+    const filteredConfigs = configs.filter(c =>
+        c.name.toLowerCase().includes(configSearch.toLowerCase()) ||
+        (c.description || '').toLowerCase().includes(configSearch.toLowerCase())
+    );
+
+    const pagedConfigs = filteredConfigs.slice((configPage - 1) * PAGE_SIZE, configPage * PAGE_SIZE);
 
     return (
         <div className="page-wrapper animate-fade-in">
@@ -746,8 +755,30 @@ export default function ConfigBuilder() {
 
             {/* Saved Configurations Table */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                     <h3 style={{ fontSize: '0.9375rem', fontWeight: 600 }}>Saved Configurations</h3>
+                    {configs.length > 0 && (
+                        <div className="table-toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'none', flex: '1', maxWidth: '360px' }}>
+                            <div className="table-toolbar-search">
+                                <span className="table-toolbar-icon">🔍</span>
+                                <input
+                                    id="config-search-input"
+                                    className="table-toolbar-input"
+                                    placeholder="Search configurations…"
+                                    value={configSearch}
+                                    onChange={e => handleConfigSearch(e.target.value)}
+                                />
+                                {configSearch && (
+                                    <button className="table-toolbar-clear" onClick={() => handleConfigSearch('')} aria-label="Clear search">✕</button>
+                                )}
+                            </div>
+                            {configSearch && (
+                                <span className="table-toolbar-count">
+                                    {filteredConfigs.length} result{filteredConfigs.length !== 1 ? 's' : ''}
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {configs.length === 0 ? (
@@ -806,9 +837,17 @@ export default function ConfigBuilder() {
                                         </td>
                                     </tr>
                                 ))}
+                                {filteredConfigs.length === 0 && configs.length > 0 && (
+                                    <tr>
+                                        <td colSpan="4" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                                            No configurations match your search.
+                                            <button className="btn-link" style={{ marginLeft: '0.5rem' }} onClick={() => handleConfigSearch('')}>Clear</button>
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
-                        <Pagination total={configs.length} page={configPage} onPage={setConfigPage} />
+                        <Pagination total={filteredConfigs.length} page={configPage} onPage={setConfigPage} />
                     </>
                 )}
             </div>

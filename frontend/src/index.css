@@ -1167,6 +1167,9 @@ textarea {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
   width: 100%;
   max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   animation: modalSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   color: #0f172a;
@@ -1267,6 +1270,8 @@ textarea {
 
 .modal-body {
   padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .modal-footer {
@@ -1356,6 +1361,119 @@ textarea {
 .pagination-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* ─── Table Toolbar (search + filter bar) ─── */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-main);
+  flex-wrap: wrap;
+}
+
+.table-toolbar-search {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: 1;
+  min-width: 180px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0 0.625rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.table-toolbar-search:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.table-toolbar-icon {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.table-toolbar-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.45rem 0;
+  font-size: 0.8125rem;
+  color: var(--text-main);
+  font-family: inherit;
+  outline: none;
+}
+
+.table-toolbar-input::placeholder {
+  color: var(--text-muted);
+}
+
+.table-toolbar-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.2rem;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.table-toolbar-clear:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.table-toolbar-select {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  padding: 0.45rem 0.625rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.table-toolbar-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.table-toolbar-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-light);
+  padding: 0.2rem 0.625rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Inline text button (for "Clear filters") */
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn-link:hover {
+  opacity: 0.75;
 }
 
 /* Parts Page Styles */
