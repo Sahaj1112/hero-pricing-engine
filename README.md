@@ -6,7 +6,7 @@ The repository is split into two applications:
 
 | App | Stack | Default URL |
 |-----|-------|-------------|
-| **Backend** (`backend/`) | Node.js, Express 5, PostgreSQL, JWT | `http://localhost:5000` |
+| **Backend** (`backend/`) | Node.js, Express 5, PostgreSQL | `http://localhost:5000` |
 | **Frontend** (`frontend/`) | React 19, Vite 8, React Router, Axios | `http://localhost:5173` |
 
 ---
@@ -14,6 +14,7 @@ The repository is split into two applications:
 ## Table of Contents
 
 - [Features](#features)
+- [Architecture Highlights](#architecture-highlights)
 - [Prerequisites](#prerequisites)
 - [Project Structure](#project-structure)
 - [Installation & Setup](#installation--setup)
@@ -25,26 +26,74 @@ The repository is split into two applications:
 - [Running Locally](#running-locally)
 - [Build & Deployment](#build--deployment)
 - [API Reference](#api-reference)
-- [Demo Credentials](#demo-credentials)
+- [Troubleshooting](#troubleshooting)
+- [Scripts Reference](#scripts-reference)
 
 ---
 
 ## Features
 
 ### Frontend
-- **Landing page** — product overview and feature highlights
-- **Authentication** — JWT-based login with protected routes
-- **Dashboard** — configuration statistics, price chart, and recent builds
-- **Parts management** — CRUD for parts with category filtering and pagination
-- **Configuration builder** — assemble cycles from frame, gear, tyre, and accessory parts
-- **Configuration viewer** — inspect saved builds with part breakdown and total price
+
+| Module | Description |
+|--------|-------------|
+| **Landing page** | Product overview and quick entry to the app |
+| **Dashboard** | Stat cards (Total Parts → Parts Manager, Total Configurations → Build Config), price analytics chart, and a recent configurations table |
+| **Parts Manager** | CRUD for parts with **server-side** pagination, category filter, and **debounced search** (300 ms) |
+| **Build Configuration** | Create/edit/delete configurations; saved-config table uses **server-side pagination + debounced search**; part pickers fetch from the API on demand |
+| **Configuration viewer** | Inspect a saved build with part breakdown and total price |
+| **Pricing Calculator** | Ad-hoc price calculation; part dropdowns load from the API with debounced search per category |
 
 ### Backend
-- **REST API** under `/api` for auth, parts, and configurations
-- **PostgreSQL persistence** with schema migrations via `schema.sql`
+
+- **REST API** under `/api` for parts and configurations
+- **Server-side pagination & search** on all list endpoints (`LIMIT`/`OFFSET` at the database level)
+- **PostgreSQL persistence** with schema via `schema.sql`
 - **Price history tracking** when part prices are updated
 - **Configuration pricing** — automatic total calculation from linked parts
-- **JWT authentication** for login (MVP uses hardcoded users; API routes are not token-guarded yet)
+- **Reusable pagination utilities** in `backend/src/utils/pagination.js`
+
+
+---
+
+## Architecture Highlights
+
+### Pagination & search (backend-driven)
+
+List endpoints no longer return a raw array. They return a paginated envelope:
+
+```json
+{
+  "success": true,
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "totalRecords": 125,
+    "totalPages": 13,
+    "hasNextPage": true,
+    "hasPreviousPage": false
+  }
+}
+```
+
+Query parameters: `page`, `limit` (max 100), `search` (case-insensitive). Parts also support `category`.
+
+The frontend **does not** load full datasets into the browser for list views. It requests one page at a time and renders pagination controls from the metadata returned by the API.
+
+### Debounced search (frontend)
+
+Search inputs in **Parts Manager** and **Build Configuration** use a shared `useDebounce` hook (`frontend/src/hooks/useDebounce.js`, 300 ms delay). The API is called only after the user pauses typing, which reduces unnecessary requests while searching large inventories.
+
+Part dropdowns in **Build Configuration** and **Pricing Calculator** also debounce search before calling `GET /api/parts`.
+
+### Layered backend structure
+
+```
+Request → routes → controllers → services → repositories → PostgreSQL
+```
+
+Business logic lives in **services**. SQL and filtering live in **repositories**. Controllers parse query params and format responses.
 
 ---
 
@@ -72,43 +121,65 @@ psql --version    # optional but recommended for CLI database setup
 
 ```
 hero-pricing-engine/
-├── README.md                 # This file
+├── README.md
 ├── .gitignore
 │
 ├── backend/
-│   ├── .env.example          # Backend environment template
+│   ├── .env.example
 │   ├── package.json
-│   ├── schema.sql            # Database tables + seed data
+│   ├── schema.sql
 │   └── src/
-│       ├── server.js         # HTTP server entry point
-│       ├── app.js            # Express app configuration
+│       ├── server.js
+│       ├── app.js
 │       ├── config/
-│       │   ├── env.js        # Environment variable loader
-│       │   ├── database.js   # PostgreSQL connection pool
-│       │   └── users.js      # Hardcoded MVP user accounts
-│       ├── routes/           # API route definitions
-│       ├── controllers/      # Request handlers
-│       ├── services/         # Business logic
-│       ├── repositories/     # Database queries
-│       ├── middlewares/      # Error handling
-│       └── utils/            # Helpers (AppError, asyncHandler)
+│       │   ├── env.js
+│       │   └── database.js
+│       ├── routes/
+│       ├── controllers/
+│       ├── services/
+│       ├── repositories/
+│       ├── middlewares/
+│       └── utils/
+│           ├── pagination.js    # parsePaginationQuery, buildPaginationMeta, sendPaginatedResponse
+│           ├── AppError.js
+│           └── asyncHandler.js
 │
 └── frontend/
-    ├── .env.example          # Frontend environment template
+    ├── .env.example
     ├── package.json
     ├── vite.config.js
     ├── index.html
-    ├── public/               # Static assets (favicon, icons)
+    ├── public/
     └── src/
-        ├── main.jsx          # React entry point
-        ├── App.jsx           # Routing and layout
-        ├── index.css         # Global styles
+        ├── main.jsx
+        ├── App.jsx
+        ├── index.css
         ├── config/
-        │   └── api.js        # API base URL (VITE_API_URL)
-        ├── components/       # Navbar, Sidebar
-
-        └── pages/            # Landing, Login, Dashboard, Parts, etc.
+        │   └── api.js              # API base URL (VITE_API_URL)
+        ├── components/
+        │   ├── Navbar.jsx
+        │   ├── Sidebar.jsx
+        │   └── Pagination.jsx      # Shared pagination controls (uses backend metadata)
+        ├── hooks/
+        │   └── useDebounce.js      # Debounce hook for search inputs
+        └── pages/
+            ├── Landing.jsx
+            ├── Dashboard.jsx
+            ├── Parts.jsx
+            ├── ConfigBuilder.jsx
+            ├── ConfigView.jsx
+            └── PricingCalculator.jsx
 ```
+
+### Frontend routes
+
+| Path | Page |
+|------|------|
+| `/` | Landing |
+| `/dashboard` | Dashboard |
+| `/parts` | Parts Manager |
+| `/builder` | Build Configuration |
+| `/config/:id` | Configuration detail |
 
 ---
 
@@ -166,7 +237,7 @@ cp .env.example .env
 Copy-Item .env.example .env
 ```
 
-Edit `backend/.env` with your PostgreSQL credentials and a JWT secret (see [Environment Variables](#environment-variables)).
+Edit `backend/.env` with your PostgreSQL credentials (see [Environment Variables](#environment-variables)).
 
 Start the API server:
 
@@ -187,6 +258,12 @@ curl http://localhost:5000/
 # {"message":"Hero Cycles API running ✅"}
 ```
 
+Verify paginated parts endpoint:
+
+```bash
+curl "http://localhost:5000/api/parts?page=1&limit=10"
+```
+
 ### 4. Frontend setup
 
 Open a **second terminal** (keep the backend running):
@@ -196,7 +273,7 @@ cd frontend
 npm install
 ```
 
-Create the frontend environment file (optional for local dev — see below):
+Create the frontend environment file (optional for local dev):
 
 ```bash
 # macOS / Linux / Git Bash
@@ -225,7 +302,6 @@ Copy from `backend/.env.example` and fill in every value:
 | `DB_NAME` | Yes | Database name | `hero_pricing` |
 | `DB_PASSWORD` | Yes | Database password | `your_password` |
 | `DB_PORT` | Yes | PostgreSQL port | `5432` |
-| `JWT_SECRET` | Yes | Secret key for signing JWT tokens | `a-long-random-string` |
 | `PORT` | No | API server port (default: `5000`) | `5000` |
 
 **Example `backend/.env`:**
@@ -236,11 +312,8 @@ DB_HOST=localhost
 DB_NAME=hero_pricing
 DB_PASSWORD=your_password
 DB_PORT=5432
-JWT_SECRET=change-me-to-a-long-random-secret
 PORT=5000
 ```
-
-> Login will fail with a `500` error if `JWT_SECRET` is missing or empty.
 
 ### Frontend (`frontend/.env`)
 
@@ -281,15 +354,16 @@ Open the app in your browser:
 | URL | Description |
 |-----|-------------|
 | `http://localhost:5173` | Frontend (landing page) |
-| `http://localhost:5173/login` | Login page |
+| `http://localhost:5173/dashboard` | Dashboard |
 | `http://localhost:5000` | Backend health check |
 
 **Quick smoke test after startup:**
 
-1. Visit `http://localhost:5173/login`
-2. Sign in with `admin` / `admin123`
-3. Open **Dashboard** — you should see configuration stats
-4. Open **Parts** — you should see the eight seeded parts
+1. Visit `http://localhost:5173` and click **Open App** (or go directly to `/dashboard`)
+2. Confirm stat cards show part and configuration counts
+3. Open **Parts Manager** — you should see seeded parts with pagination controls
+4. Type in the search box — results update after a brief pause (debounced)
+5. Open **Build Configuration** — search saved configs; create a new configuration using the part pickers
 
 ---
 
@@ -351,21 +425,23 @@ All JSON API routes are prefixed with `/api`. Errors return `{ "error": "message
 |--------|----------|-------------|
 | `GET` | `/` | API status message |
 
-### Authentication
-
-| Method | Endpoint | Body | Response |
-|--------|----------|------|----------|
-| `POST` | `/api/auth/login` | `{ "username": "admin", "password": "admin123" }` | `{ "token": "...", "user": { "id", "username", "role" } }` |
-
 ### Parts
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/parts` | Paginated parts list (see query params below) |
-| `POST` | `/api/parts` | Create a part — body: `{ "name", "category", "price" }` |
+| `GET` | `/api/parts` | Paginated parts list |
+| `POST` | `/api/parts` | Create a part |
 | `PUT` | `/api/parts/:id` | Update a part (records price history on price change) |
 | `DELETE` | `/api/parts/:id` | Delete a part |
 | `GET` | `/api/parts/:id/history` | Paginated price change history for a part |
+
+**Create / update body:**
+
+```json
+{ "name": "Aluminium Frame", "category": "frame", "price": 2500 }
+```
+
+**Valid `category` values:** `frame`, `gear`, `tyre`, `accessory`
 
 **List query parameters (`GET /api/parts`, `GET /api/parts/:id/history`):**
 
@@ -373,8 +449,8 @@ All JSON API routes are prefixed with `/api`. Errors return `{ "error": "message
 |-------|---------|-------------|
 | `page` | `1` | Page number |
 | `limit` | `10` | Records per page (max 100) |
-| `search` | — | Case-insensitive search (`name`, `category` for parts; prices for history) |
-| `category` | — | Filter parts by category (`frame`, `gear`, `tyre`, `accessory`) |
+| `search` | — | Case-insensitive search (`name`, `category` for parts; price values for history) |
+| `category` | — | Filter parts by category (`frame`, `gear`, `tyre`, `accessory`) — parts list only |
 
 **Paginated list response:**
 
@@ -393,20 +469,19 @@ All JSON API routes are prefixed with `/api`. Errors return `{ "error": "message
 }
 ```
 
-**Example — search parts:**
+**Examples:**
 
 ```bash
+# Paginated parts with search and category filter
 curl "http://localhost:5000/api/parts?page=1&limit=10&search=tyre&category=tyre"
-```
 
-**Valid `category` values:** `frame`, `gear`, `tyre`, `accessory`
-
-**Example — create a part:**
-
-```bash
+# Create a part
 curl -X POST http://localhost:5000/api/parts \
   -H "Content-Type: application/json" \
   -d '{"name":"Carbon Frame","category":"frame","price":4500}'
+
+# Paginated price history
+curl "http://localhost:5000/api/parts/1/history?page=1&limit=10"
 ```
 
 ### Configurations
@@ -414,11 +489,21 @@ curl -X POST http://localhost:5000/api/parts \
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/configurations/stats` | Dashboard stats (totals, averages, enriched config list for charts) |
-| `GET` | `/api/configurations` | Paginated configurations list (see query params below) |
+| `GET` | `/api/configurations` | Paginated configurations list |
 | `GET` | `/api/configurations/:id` | Single configuration with parts and `total_price` |
-| `POST` | `/api/configurations` | Create configuration — body: `{ "name", "description", "part_ids": [1, 3, 5] }` |
-| `PUT` | `/api/configurations/:id` | Update configuration — same body as create |
+| `POST` | `/api/configurations` | Create configuration |
+| `PUT` | `/api/configurations/:id` | Update configuration |
 | `DELETE` | `/api/configurations/:id` | Delete a configuration |
+
+**Create / update body:**
+
+```json
+{
+  "name": "City Commuter",
+  "description": "Budget daily rider",
+  "part_ids": [2, 4, 6, 7]
+}
+```
 
 **List query parameters (`GET /api/configurations`):**
 
@@ -428,32 +513,23 @@ curl -X POST http://localhost:5000/api/parts \
 | `limit` | `10` | Records per page (max 100) |
 | `search` | — | Case-insensitive search on `name` and `description` |
 
-**Example — search configurations:**
+**Examples:**
 
 ```bash
+# Paginated search
 curl "http://localhost:5000/api/configurations?page=1&limit=10&search=mountain"
-```
 
-**Example — create a configuration:**
+# Recent configs for dashboard (first page, limit 5)
+curl "http://localhost:5000/api/configurations?page=1&limit=5"
 
-```bash
+# Dashboard stats
+curl "http://localhost:5000/api/configurations/stats"
+
+# Create a configuration
 curl -X POST http://localhost:5000/api/configurations \
   -H "Content-Type: application/json" \
   -d '{"name":"City Commuter","description":"Budget daily rider","part_ids":[2,4,6,7]}'
 ```
-
----
-
-## Demo Credentials
-
-Authentication uses hardcoded MVP accounts in `backend/src/config/users.js`:
-
-| Username | Password | Role |
-|----------|----------|------|
-| `admin` | `admin123` | salesperson |
-| `sales1` | `sales123` | salesperson |
-
-JWT tokens expire after **8 hours**. The frontend stores the token in `localStorage`.
 
 ---
 
@@ -471,8 +547,6 @@ JWT tokens expire after **8 hours**. The frontend stores the token in `localStor
 node --version
 ```
 
-If multiple Node installations exist, ensure the correct one is first on your `PATH`.
-
 ### Backend starts but API returns `500` errors
 
 **Common causes:**
@@ -480,7 +554,6 @@ If multiple Node installations exist, ensure the correct one is first on your `P
 1. **PostgreSQL is not running** — start the PostgreSQL service.
 2. **Database not created or schema not applied** — re-run `backend/schema.sql`.
 3. **Wrong credentials in `backend/.env`** — verify `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, and `DB_NAME`.
-4. **Missing `JWT_SECRET`** — login specifically requires this; set it in `backend/.env` and restart the server.
 
 Test the database connection manually:
 
@@ -489,10 +562,24 @@ psql -U postgres -d hero_pricing -c "SELECT COUNT(*) FROM parts;"
 # Should return 8 after running schema.sql
 ```
 
-### Login returns "Invalid username or password" (401)
+### Parts or configurations table is empty / shows errors
 
-- Confirm you are using `admin` / `admin123` or `sales1` / `sales123`.
-- Check that the backend is running on the port expected by the frontend.
+**Symptom:** Frontend tables show "Loading…" forever or empty results.
+
+**Fixes:**
+
+1. Confirm backend is running: `curl http://localhost:5000/`
+2. Test paginated endpoint directly:
+   ```bash
+   curl "http://localhost:5000/api/parts?page=1&limit=10"
+   ```
+   Response must include `success`, `data`, and `pagination` — not a bare array.
+3. Check browser DevTools → Network for failed requests to `VITE_API_URL`.
+4. Restart Vite after changing `frontend/.env`.
+
+### Search feels slow or fires too many requests
+
+Search in Parts Manager and Build Configuration is **debounced by 300 ms**. A short pause after typing is expected before results update. This is intentional to avoid hammering the API on every keystroke.
 
 ### Frontend cannot reach the API (network errors in browser console)
 
@@ -500,6 +587,10 @@ psql -U postgres -d hero_pricing -c "SELECT COUNT(*) FROM parts;"
 2. Check `frontend/.env` — `VITE_API_URL` should be `http://localhost:5000` with **no trailing slash**.
 3. After changing `frontend/.env`, restart the Vite dev server (`Ctrl+C`, then `npm run dev` again).
 4. For production builds, rebuild after changing `VITE_API_URL`.
+
+### Config builder won't save
+
+The form requires **one part from each required category** (frame, gear, tyre). Accessories are optional.
 
 ---
 
@@ -520,5 +611,3 @@ psql -U postgres -d hero_pricing -c "SELECT COUNT(*) FROM parts;"
 | `npm run build` | Production build to `dist/` |
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Run ESLint |
-
-
