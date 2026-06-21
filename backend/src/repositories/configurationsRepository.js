@@ -1,6 +1,18 @@
 const pool = require('../config/database');
 
 class ConfigurationsRepository {
+    _buildSearchClause(search) {
+        if (!search) {
+            return { where: '', params: [], paramIndex: 1 };
+        }
+
+        return {
+            where: 'WHERE (c.name ILIKE $1 OR c.description ILIKE $1)',
+            params: [`%${search}%`],
+            paramIndex: 2,
+        };
+    }
+
     async findAllEnriched() {
         const result = await pool.query(`
             SELECT
@@ -19,11 +31,24 @@ class ConfigurationsRepository {
         return result.rows;
     }
 
-    async findAll() {
+    async findPaginated({ search = '', limit, offset }) {
+        const { where, params, paramIndex } = this._buildSearchClause(search);
+
         const result = await pool.query(
-            'SELECT * FROM configurations ORDER BY created_at DESC'
+            `SELECT c.* FROM configurations c ${where} ORDER BY c.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+            [...params, limit, offset]
         );
         return result.rows;
+    }
+
+    async countFiltered({ search = '' }) {
+        const { where, params } = this._buildSearchClause(search);
+
+        const result = await pool.query(
+            `SELECT COUNT(*)::int AS cnt FROM configurations c ${where}`,
+            params
+        );
+        return result.rows[0].cnt;
     }
 
     async findById(id) {

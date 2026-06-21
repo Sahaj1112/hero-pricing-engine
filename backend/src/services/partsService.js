@@ -1,9 +1,18 @@
 const partsRepository = require('../repositories/partsRepository');
 const AppError = require('../utils/AppError');
+const { buildPaginationMeta } = require('../utils/pagination');
 
 class PartsService {
-    async getAllParts() {
-        return partsRepository.findAll();
+    async getParts({ page, limit, offset, search, category }) {
+        const [data, totalRecords] = await Promise.all([
+            partsRepository.findPaginated({ search, category, limit, offset }),
+            partsRepository.countFiltered({ search, category }),
+        ]);
+
+        return {
+            data,
+            pagination: buildPaginationMeta(page, limit, totalRecords),
+        };
     }
 
     async createPart(data) {
@@ -26,8 +35,16 @@ class PartsService {
         return { message: 'Part deleted' };
     }
 
-    async getPriceHistory(id) {
-        return partsRepository.findPriceHistory(id);
+    async getPriceHistory(id, { page, limit, offset, search }) {
+        const [data, totalRecords] = await Promise.all([
+            partsRepository.findPriceHistoryPaginated(id, { search, limit, offset }),
+            partsRepository.countPriceHistory(id, { search }),
+        ]);
+
+        return {
+            data,
+            pagination: buildPaginationMeta(page, limit, totalRecords),
+        };
     }
 }
 

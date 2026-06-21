@@ -1,7 +1,9 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config/api';
+import Pagination from '../components/Pagination';
+import useDebounce from '../hooks/useDebounce';
 
 /* Required part categories (frame/gear/tyre) */
 const REQUIRED_CATEGORIES = [
@@ -13,17 +15,16 @@ const REQUIRED_CATEGORIES = [
 const PAGE_SIZE = 10;
 
 /* ─── Searchable Single-Select Dropdown (for required parts) ─── */
-function CategorySelect({ category, parts, value, onChange, hasError }) {
+function CategorySelect({ category, value, onChange, hasError, selectedPart }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
+    const [options, setOptions] = useState([]);
+    const [loading, setLoading] = useState(false);
     const ref = useRef(null);
     const inputRef = useRef(null);
+    const debouncedSearch = useDebounce(search);
 
-    const filtered = parts
-        .filter(p => p.category === category.key)
-        .filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-
-    const selected = parts.find(p => p.id === value) || null;
+    const selected = selectedPart || options.find(p => p.id === value) || null;
 
     useEffect(() => {
         const handler = (e) => {
@@ -32,6 +33,23 @@ function CategorySelect({ category, parts, value, onChange, hasError }) {
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const controller = new AbortController();
+        setLoading(true);
+
+        const params = { page: 1, limit: 50, category: category.key };
+        if (debouncedSearch) params.search = debouncedSearch;
+
+        axios.get(`${API_URL}/api/parts`, { params, signal: controller.signal })
+            .then(r => setOptions(r.data.data))
+            .catch(() => { if (!controller.signal.aborted) setOptions([]); })
+            .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+
+        return () => controller.abort();
+    }, [open, debouncedSearch, category.key]);
 
     const openDropdown = () => {
         setOpen(true);
@@ -71,9 +89,11 @@ function CategorySelect({ category, parts, value, onChange, hasError }) {
                         />
                     </div>
                     <div className="cat-options">
-                        {filtered.length === 0
+                        {loading
+                            ? <div className="cat-option-empty">Loading…</div>
+                            : options.length === 0
                             ? <div className="cat-option-empty">No matches found</div>
-                            : filtered.map(p => (
+                            : options.map(p => (
                                 <div
                                     key={p.id}
                                     className={`cat-option ${p.id === value ? 'active' : ''}`}
@@ -92,18 +112,16 @@ function CategorySelect({ category, parts, value, onChange, hasError }) {
 }
 
 /* ─── Accessory Multi-Select with search + tag chips ─── */
-function AccessoryMultiSelect({ parts, selectedIds, onChange }) {
+function AccessoryMultiSelect({ selectedIds, selectedParts, onChange }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
+    const [options, setOptions] = useState([]);
+    const [loading, setLoading] = useState(false);
     const ref = useRef(null);
     const inputRef = useRef(null);
+    const debouncedSearch = useDebounce(search);
 
-    const accessories = parts.filter(p => p.category === 'accessory');
-    const filtered = accessories.filter(p =>
-        p.name.toLowerCase().includes(search.toLowerCase())
-    );
-
-    const selectedParts = accessories.filter(p => selectedIds.includes(p.id));
+    const selectedPartList = selectedParts.filter(p => selectedIds.includes(p.id));
 
     useEffect(() => {
         const handler = (e) => {
@@ -113,6 +131,23 @@ function AccessoryMultiSelect({ parts, selectedIds, onChange }) {
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
+    useEffect(() => {
+        if (!open) return;
+
+        const controller = new AbortController();
+        setLoading(true);
+
+        const params = { page: 1, limit: 50, category: 'accessory' };
+        if (debouncedSearch) params.search = debouncedSearch;
+
+        axios.get(`${API_URL}/api/parts`, { params, signal: controller.signal })
+            .then(r => setOptions(r.data.data))
+            .catch(() => { if (!controller.signal.aborted) setOptions([]); })
+            .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+
+        return () => controller.abort();
+    }, [open, debouncedSearch]);
+
     const openDropdown = () => {
         setOpen(true);
         setSearch('');
@@ -121,30 +156,36 @@ function AccessoryMultiSelect({ parts, selectedIds, onChange }) {
 
     const toggle = (part) => {
         if (selectedIds.includes(part.id)) {
-            onChange(selectedIds.filter(id => id !== part.id));
+            onChange(
+                selectedIds.filter(id => id !== part.id),
+                selectedParts.filter(p => p.id !== part.id)
+            );
         } else {
-            onChange([...selectedIds, part.id]);
+            onChange([...selectedIds, part.id], [...selectedParts, part]);
         }
     };
 
     const remove = (e, id) => {
         e.stopPropagation();
-        onChange(selectedIds.filter(sid => sid !== id));
+        onChange(
+            selectedIds.filter(sid => sid !== id),
+            selectedParts.filter(p => p.id !== id)
+        );
     };
 
     return (
         <div className="cat-select" ref={ref}>
             {/* Trigger */}
             <div
-                className={`cat-select-trigger ${open ? 'focused' : ''} ${selectedParts.length > 0 ? 'has-value' : ''}`}
+                className={`cat-select-trigger ${open ? 'focused' : ''} ${selectedPartList.length > 0 ? 'has-value' : ''}`}
                 onClick={openDropdown}
-                style={{ height: 'auto', minHeight: '2.375rem', flexWrap: 'wrap', gap: '0.3rem', padding: selectedParts.length ? '0.3rem 0.5rem' : undefined }}
+                style={{ height: 'auto', minHeight: '2.375rem', flexWrap: 'wrap', gap: '0.3rem', padding: selectedPartList.length ? '0.3rem 0.5rem' : undefined }}
             >
                 <span className="cat-select-label" style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
-                    {selectedParts.length === 0 ? (
+                    {selectedPartList.length === 0 ? (
                         <span className="cat-select-placeholder">Select Accessories… (optional)</span>
                     ) : (
-                        selectedParts.map(p => (
+                        selectedPartList.map(p => (
                             <span
                                 key={p.id}
                                 style={{
@@ -198,12 +239,12 @@ function AccessoryMultiSelect({ parts, selectedIds, onChange }) {
                         />
                     </div>
                     <div className="cat-options">
-                        {accessories.length === 0 ? (
-                            <div className="cat-option-empty">No accessories available</div>
-                        ) : filtered.length === 0 ? (
+                        {loading ? (
+                            <div className="cat-option-empty">Loading…</div>
+                        ) : options.length === 0 ? (
                             <div className="cat-option-empty">No matches found</div>
                         ) : (
-                            filtered.map(p => {
+                            options.map(p => {
                                 const isSelected = selectedIds.includes(p.id);
                                 return (
                                     <div
@@ -249,7 +290,7 @@ function AccessoryMultiSelect({ parts, selectedIds, onChange }) {
                             <span>{selectedIds.length} selected</span>
                             <button
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.75rem', fontWeight: 600 }}
-                                onClick={(e) => { e.stopPropagation(); onChange([]); }}
+                                onClick={(e) => { e.stopPropagation(); onChange([], []); }}
                             >
                                 Clear all
                             </button>
@@ -261,49 +302,27 @@ function AccessoryMultiSelect({ parts, selectedIds, onChange }) {
     );
 }
 
-/* ─── Compact Pagination ─── */
-function Pagination({ total, page, onPage }) {
-    const totalPages = Math.ceil(total / PAGE_SIZE);
-    if (totalPages <= 1) return null;
-    const from = (page - 1) * PAGE_SIZE + 1;
-    const to = Math.min(page * PAGE_SIZE, total);
-    return (
-        <div className="pagination">
-            <span className="pagination-info">Showing {from}–{to} of {total}</span>
-            <div className="pagination-controls">
-                <button className="pagination-btn" onClick={() => onPage(page - 1)} disabled={page === 1}>‹</button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                    <button key={p} className={`pagination-btn ${p === page ? 'active' : ''}`} onClick={() => onPage(p)}>{p}</button>
-                ))}
-                <button className="pagination-btn" onClick={() => onPage(page + 1)} disabled={page === totalPages}>›</button>
-            </div>
-        </div>
-    );
-}
-
 /* ─── Shared Config Form Body ─── */
 function ConfigFormBody({
-    parts,
     name, setName,
     desc, setDesc,
     selections, setSelections,
+    selectedParts, setSelectedParts,
     selectedAccessories, setSelectedAccessories,
+    accessoryParts, setAccessoryParts,
     nameError, setNameError,
     catErrors, setCatErrors,
 }) {
     const selectPart = (cat, part) => {
         setSelections(prev => ({ ...prev, [cat]: part ? part.id : null }));
+        setSelectedParts(prev => ({ ...prev, [cat]: part }));
         if (catErrors[cat]) setCatErrors(prev => ({ ...prev, [cat]: false }));
     };
 
-    // Price preview: required parts + accessories
-    const requiredSelected = parts.filter(p =>
-        REQUIRED_CATEGORIES.some(cat => selections[cat.key] === p.id)
-    );
-    const accessorySelected = parts.filter(p =>
-        p.category === 'accessory' && selectedAccessories.includes(p.id)
-    );
-    const allSelectedParts = [...requiredSelected, ...accessorySelected];
+    const allSelectedParts = [
+        ...REQUIRED_CATEGORIES.map(cat => selectedParts[cat.key]).filter(Boolean),
+        ...accessoryParts,
+    ];
     const total = allSelectedParts.reduce((s, p) => s + parseFloat(p.price), 0);
 
     const missedRequired = REQUIRED_CATEGORIES.filter(cat => !selections[cat.key]).length;
@@ -371,8 +390,8 @@ function ConfigFormBody({
                             </label>
                             <CategorySelect
                                 category={cat}
-                                parts={parts}
                                 value={selections[cat.key]}
+                                selectedPart={selectedParts[cat.key]}
                                 onChange={(part) => selectPart(cat.key, part)}
                                 hasError={!!catErrors[cat.key]}
                             />
@@ -410,9 +429,12 @@ function ConfigFormBody({
                     </p>
                 </div>
                 <AccessoryMultiSelect
-                    parts={parts}
                     selectedIds={selectedAccessories}
-                    onChange={setSelectedAccessories}
+                    selectedParts={accessoryParts}
+                    onChange={(ids, parts) => {
+                        setSelectedAccessories(ids);
+                        setAccessoryParts(parts);
+                    }}
                 />
             </div>
 
@@ -428,11 +450,13 @@ function ConfigFormBody({
 }
 
 /* ─── New Configuration Modal ─── */
-function NewConfigModal({ parts, onClose, onSaved }) {
+function NewConfigModal({ onClose, onSaved }) {
     const [name, setName] = useState('');
     const [desc, setDesc] = useState('');
     const [selections, setSelections] = useState({ frame: null, gear: null, tyre: null });
+    const [selectedParts, setSelectedParts] = useState({ frame: null, gear: null, tyre: null });
     const [selectedAccessories, setSelectedAccessories] = useState([]);
+    const [accessoryParts, setAccessoryParts] = useState([]);
     const [nameError, setNameError] = useState('');
     const [catErrors, setCatErrors] = useState({});
     const [saving, setSaving] = useState(false);
@@ -484,11 +508,12 @@ function NewConfigModal({ parts, onClose, onSaved }) {
                 </div>
                 <div className="modal-body" style={{ padding: '1.25rem 1.5rem' }}>
                     <ConfigFormBody
-                        parts={parts}
                         name={name} setName={setName}
                         desc={desc} setDesc={setDesc}
                         selections={selections} setSelections={setSelections}
+                        selectedParts={selectedParts} setSelectedParts={setSelectedParts}
                         selectedAccessories={selectedAccessories} setSelectedAccessories={setSelectedAccessories}
+                        accessoryParts={accessoryParts} setAccessoryParts={setAccessoryParts}
                         nameError={nameError} setNameError={setNameError}
                         catErrors={catErrors} setCatErrors={setCatErrors}
                     />
@@ -512,11 +537,13 @@ function NewConfigModal({ parts, onClose, onSaved }) {
 }
 
 /* ─── Edit Configuration Modal ─── */
-function EditConfigModal({ config, parts, onClose, onSaved }) {
+function EditConfigModal({ config, onClose, onSaved }) {
     const [name, setName] = useState(config.name);
     const [desc, setDesc] = useState(config.description || '');
     const [selections, setSelections] = useState({ frame: null, gear: null, tyre: null });
+    const [selectedParts, setSelectedParts] = useState({ frame: null, gear: null, tyre: null });
     const [selectedAccessories, setSelectedAccessories] = useState([]);
+    const [accessoryParts, setAccessoryParts] = useState([]);
     const [nameError, setNameError] = useState('');
     const [catErrors, setCatErrors] = useState({});
     const [saving, setSaving] = useState(false);
@@ -529,16 +556,22 @@ function EditConfigModal({ config, parts, onClose, onSaved }) {
             .then(r => {
                 const configParts = r.data.parts || [];
                 const newSel = { frame: null, gear: null, tyre: null };
+                const newSelectedParts = { frame: null, gear: null, tyre: null };
                 const accIds = [];
+                const accParts = [];
                 configParts.forEach(p => {
                     if (p.category === 'accessory') {
                         accIds.push(p.id);
+                        accParts.push(p);
                     } else if (newSel.hasOwnProperty(p.category)) {
                         newSel[p.category] = p.id;
+                        newSelectedParts[p.category] = p;
                     }
                 });
                 setSelections(newSel);
+                setSelectedParts(newSelectedParts);
                 setSelectedAccessories(accIds);
+                setAccessoryParts(accParts);
             })
             .catch(() => { })
             .finally(() => setLoadingParts(false));
@@ -593,11 +626,12 @@ function EditConfigModal({ config, parts, onClose, onSaved }) {
                         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
                     ) : (
                         <ConfigFormBody
-                            parts={parts}
                             name={name} setName={setName}
                             desc={desc} setDesc={setDesc}
                             selections={selections} setSelections={setSelections}
+                            selectedParts={selectedParts} setSelectedParts={setSelectedParts}
                             selectedAccessories={selectedAccessories} setSelectedAccessories={setSelectedAccessories}
+                            accessoryParts={accessoryParts} setAccessoryParts={setAccessoryParts}
                             nameError={nameError} setNameError={setNameError}
                             catErrors={catErrors} setCatErrors={setCatErrors}
                         />
@@ -659,52 +693,61 @@ function DeleteConfigModal({ config, onClose, onDeleted }) {
 
 /* ─── Main ConfigBuilder ─── */
 export default function ConfigBuilder() {
-    const [parts, setParts] = useState([]);
     const [configs, setConfigs] = useState([]);
+    const [pagination, setPagination] = useState(null);
+    const [configPage, setConfigPage] = useState(1);
+    const [configSearch, setConfigSearch] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [refresh, setRefresh] = useState(0);
     const [modalOpen, setModalOpen] = useState(false);
     const [editConfig, setEditConfig] = useState(null);
     const [deleteConfig, setDeleteConfig] = useState(null);
-    const [configPage, setConfigPage] = useState(1);
     const [toast, setToast] = useState('');
     const navigate = useNavigate();
 
-    const [configSearch, setConfigSearch] = useState('');
+    const loadConfigs = useCallback(async () => {
+        setLoading(true);
+        try {
+            const params = { page: configPage, limit: PAGE_SIZE };
+            if (configSearch) params.search = configSearch;
 
-    const loadData = () => {
-        axios.get(`${API_URL}/api/parts`).then(r => setParts(r.data));
-        axios.get(`${API_URL}/api/configurations`).then(r => setConfigs(r.data));
-    };
+            const res = await axios.get(`${API_URL}/api/configurations`, { params });
+            setConfigs(res.data.data);
+            setPagination(res.data.pagination);
+        } catch {
+            setConfigs([]);
+            setPagination(null);
+        } finally {
+            setLoading(false);
+        }
+    }, [configPage, configSearch]);
 
-    useEffect(() => { loadData(); }, []);
+    useEffect(() => { loadConfigs(); }, [loadConfigs, refresh]);
 
     const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
     const handleSaved = () => {
-        loadData();
         setConfigPage(1);
+        setRefresh(r => r + 1);
         showToast('Configuration saved successfully!');
     };
 
     const handleUpdated = () => {
-        loadData();
+        setRefresh(r => r + 1);
         showToast('Configuration updated successfully!');
     };
 
     const handleDeleted = (msg) => {
-        loadData();
         setDeleteConfig(null);
         setConfigPage(1);
+        setRefresh(r => r + 1);
         showToast(msg);
     };
 
     const handleConfigSearch = (val) => { setConfigSearch(val); setConfigPage(1); };
 
-    const filteredConfigs = configs.filter(c =>
-        c.name.toLowerCase().includes(configSearch.toLowerCase()) ||
-        (c.description || '').toLowerCase().includes(configSearch.toLowerCase())
-    );
-
-    const pagedConfigs = filteredConfigs.slice((configPage - 1) * PAGE_SIZE, configPage * PAGE_SIZE);
+    const totalRecords = pagination?.totalRecords ?? 0;
+    const isEmpty = !loading && totalRecords === 0 && !configSearch;
 
     return (
         <div className="page-wrapper animate-fade-in">
@@ -713,7 +756,6 @@ export default function ConfigBuilder() {
             {/* New Config Modal */}
             {modalOpen && (
                 <NewConfigModal
-                    parts={parts}
                     onClose={() => setModalOpen(false)}
                     onSaved={handleSaved}
                 />
@@ -723,7 +765,6 @@ export default function ConfigBuilder() {
             {editConfig && (
                 <EditConfigModal
                     config={editConfig}
-                    parts={parts}
                     onClose={() => setEditConfig(null)}
                     onSaved={handleUpdated}
                 />
@@ -757,7 +798,7 @@ export default function ConfigBuilder() {
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                     <h3 style={{ fontSize: '0.9375rem', fontWeight: 600 }}>Saved Configurations</h3>
-                    {configs.length > 0 && (
+                    {!isEmpty && (
                         <div className="table-toolbar" style={{ margin: 0, padding: 0, border: 'none', background: 'none', flex: '1', maxWidth: '360px' }}>
                             <div className="table-toolbar-search">
                                 <span className="table-toolbar-icon">🔍</span>
@@ -772,16 +813,16 @@ export default function ConfigBuilder() {
                                     <button className="table-toolbar-clear" onClick={() => handleConfigSearch('')} aria-label="Clear search">✕</button>
                                 )}
                             </div>
-                            {configSearch && (
+                            {configSearch && pagination && (
                                 <span className="table-toolbar-count">
-                                    {filteredConfigs.length} result{filteredConfigs.length !== 1 ? 's' : ''}
+                                    {totalRecords} result{totalRecords !== 1 ? 's' : ''}
                                 </span>
                             )}
                         </div>
                     )}
                 </div>
 
-                {configs.length === 0 ? (
+                {isEmpty ? (
                     <div className="empty-state">
                         <p className="text-muted mb-4" style={{ marginBottom: '1rem' }}>
                             No configurations yet. Create your first bike configuration!
@@ -805,7 +846,13 @@ export default function ConfigBuilder() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {pagedConfigs.map((c, i) => (
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan="4" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                                            Loading configurations…
+                                        </td>
+                                    </tr>
+                                ) : configs.map((c, i) => (
                                     <tr key={c.id}>
                                         <td className="text-muted" style={{ width: '2.5rem' }}>
                                             {(configPage - 1) * PAGE_SIZE + i + 1}
@@ -837,7 +884,7 @@ export default function ConfigBuilder() {
                                         </td>
                                     </tr>
                                 ))}
-                                {filteredConfigs.length === 0 && configs.length > 0 && (
+                                {!loading && configs.length === 0 && (
                                     <tr>
                                         <td colSpan="4" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
                                             No configurations match your search.
@@ -847,7 +894,7 @@ export default function ConfigBuilder() {
                                 )}
                             </tbody>
                         </table>
-                        <Pagination total={filteredConfigs.length} page={configPage} onPage={setConfigPage} />
+                        <Pagination pagination={pagination} onPage={setConfigPage} loading={loading} />
                     </>
                 )}
             </div>

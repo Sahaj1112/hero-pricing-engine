@@ -1,4 +1,5 @@
 const configurationsService = require('../services/configurationsService');
+const { parsePaginationQuery, sendPaginatedResponse } = require('../utils/pagination');
 
 class ConfigurationsController {
     async getStats(req, res) {
@@ -7,8 +8,10 @@ class ConfigurationsController {
     }
 
     async getAll(req, res) {
-        const configs = await configurationsService.getAllConfigurations();
-        res.json(configs);
+        const { page, limit, offset, search } = parsePaginationQuery(req.query);
+
+        const result = await configurationsService.getConfigurations({ page, limit, offset, search });
+        sendPaginatedResponse(res, result.data, result.pagination);
     }
 
     async getById(req, res) {
@@ -27,7 +30,6 @@ class ConfigurationsController {
     }
 
     async update(req, res) {
-        console.log(req.body)
         const { name, description, part_ids } = req.body;
         const config = await configurationsService.updateConfiguration(req.params.id, {
             name,

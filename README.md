@@ -361,11 +361,43 @@ All JSON API routes are prefixed with `/api`. Errors return `{ "error": "message
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/parts` | List all parts (ordered by category, name) |
+| `GET` | `/api/parts` | Paginated parts list (see query params below) |
 | `POST` | `/api/parts` | Create a part — body: `{ "name", "category", "price" }` |
 | `PUT` | `/api/parts/:id` | Update a part (records price history on price change) |
 | `DELETE` | `/api/parts/:id` | Delete a part |
-| `GET` | `/api/parts/:id/history` | Price change history for a part |
+| `GET` | `/api/parts/:id/history` | Paginated price change history for a part |
+
+**List query parameters (`GET /api/parts`, `GET /api/parts/:id/history`):**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `page` | `1` | Page number |
+| `limit` | `10` | Records per page (max 100) |
+| `search` | — | Case-insensitive search (`name`, `category` for parts; prices for history) |
+| `category` | — | Filter parts by category (`frame`, `gear`, `tyre`, `accessory`) |
+
+**Paginated list response:**
+
+```json
+{
+  "success": true,
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "totalRecords": 125,
+    "totalPages": 13,
+    "hasNextPage": true,
+    "hasPreviousPage": false
+  }
+}
+```
+
+**Example — search parts:**
+
+```bash
+curl "http://localhost:5000/api/parts?page=1&limit=10&search=tyre&category=tyre"
+```
 
 **Valid `category` values:** `frame`, `gear`, `tyre`, `accessory`
 
@@ -381,11 +413,26 @@ curl -X POST http://localhost:5000/api/parts \
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/configurations/stats` | Dashboard stats (totals, averages, enriched config list) |
-| `GET` | `/api/configurations` | List all configurations |
+| `GET` | `/api/configurations/stats` | Dashboard stats (totals, averages, enriched config list for charts) |
+| `GET` | `/api/configurations` | Paginated configurations list (see query params below) |
 | `GET` | `/api/configurations/:id` | Single configuration with parts and `total_price` |
 | `POST` | `/api/configurations` | Create configuration — body: `{ "name", "description", "part_ids": [1, 3, 5] }` |
+| `PUT` | `/api/configurations/:id` | Update configuration — same body as create |
 | `DELETE` | `/api/configurations/:id` | Delete a configuration |
+
+**List query parameters (`GET /api/configurations`):**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `page` | `1` | Page number |
+| `limit` | `10` | Records per page (max 100) |
+| `search` | — | Case-insensitive search on `name` and `description` |
+
+**Example — search configurations:**
+
+```bash
+curl "http://localhost:5000/api/configurations?page=1&limit=10&search=mountain"
+```
 
 **Example — create a configuration:**
 

@@ -1,6 +1,7 @@
 const configurationsRepository = require('../repositories/configurationsRepository');
 const partsRepository = require('../repositories/partsRepository');
 const AppError = require('../utils/AppError');
+const { buildPaginationMeta } = require('../utils/pagination');
 
 class ConfigurationsService {
     async getStats() {
@@ -31,8 +32,16 @@ class ConfigurationsService {
         };
     }
 
-    async getAllConfigurations() {
-        return configurationsRepository.findAll();
+    async getConfigurations({ page, limit, offset, search }) {
+        const [data, totalRecords] = await Promise.all([
+            configurationsRepository.findPaginated({ search, limit, offset }),
+            configurationsRepository.countFiltered({ search }),
+        ]);
+
+        return {
+            data,
+            pagination: buildPaginationMeta(page, limit, totalRecords),
+        };
     }
 
     async getConfigurationById(id) {

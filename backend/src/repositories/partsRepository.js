@@ -1,9 +1,47 @@
 const pool = require('../config/database');
 
+const VALID_CATEGORIES = ['frame', 'gear', 'tyre', 'accessory'];
+
 class PartsRepository {
-    async findAll() {
-        const result = await pool.query('SELECT * FROM parts ORDER BY category, name');
+    _buildFilterClause(search, category) {
+        const conditions = [];
+        const params = [];
+        let paramIndex = 1;
+
+        if (search) {
+            conditions.push(`(name ILIKE $${paramIndex} OR category ILIKE $${paramIndex})`);
+            params.push(`%${search}%`);
+            paramIndex++;
+        }
+
+        if (category && category !== 'all' && VALID_CATEGORIES.includes(category)) {
+            conditions.push(`category = $${paramIndex}`);
+            params.push(category);
+            paramIndex++;
+        }
+
+        const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        return { where, params, paramIndex };
+    }
+
+    async findPaginated({ search = '', category = '', limit, offset }) {
+        const { where, params, paramIndex } = this._buildFilterClause(search, category);
+
+        const result = await pool.query(
+            `SELECT * FROM parts ${where} ORDER BY category, name LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+            [...params, limit, offset]
+        );
         return result.rows;
+    }
+
+    async countFiltered({ search = '', category = '' }) {
+        const { where, params } = this._buildFilterClause(search, category);
+
+        const result = await pool.query(
+            `SELECT COUNT(*)::int AS cnt FROM parts ${where}`,
+            params
+        );
+        return result.rows[0].cnt;
     }
 
     async create({ name, category, price }) {
@@ -38,12 +76,40 @@ class PartsRepository {
         await pool.query('DELETE FROM parts WHERE id = $1', [id]);
     }
 
-    async findPriceHistory(partId) {
+    async findPriceHistoryPaginated(partId, { search = '', limit, offset }) {
+        const params = [partId];
+        let where = 'WHERE part_id = $1';
+
+        if (search) {
+            params.push(`%${search}%`);
+            where += ` AND (old_price::text ILIKE $2 OR new_price::text ILIKE $2)`;
+        }
+
+        params.push(limit, offset);
+        const limitIdx = params.length - 1;
+        const offsetIdx = params.length;
+
         const result = await pool.query(
-            'SELECT * FROM price_history WHERE part_id = $1 ORDER BY changed_at DESC',
-            [partId]
+            `SELECT * FROM price_history ${where} ORDER BY changed_at DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+            params
         );
         return result.rows;
+    }
+
+    async countPriceHistory(partId, { search = '' }) {
+        const params = [partId];
+        let where = 'WHERE part_id = $1';
+
+        if (search) {
+            params.push(`%${search}%`);
+            where += ` AND (old_price::text ILIKE $2 OR new_price::text ILIKE $2)`;
+        }
+
+        const result = await pool.query(
+            `SELECT COUNT(*)::int AS cnt FROM price_history ${where}`,
+            params
+        );
+        return result.rows[0].cnt;
     }
 
     async countAll() {

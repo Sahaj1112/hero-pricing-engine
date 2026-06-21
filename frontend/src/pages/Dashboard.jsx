@@ -184,31 +184,28 @@ function StatCard({ icon, label, value, sub, accent, onClick }) {
 
 /* ─── Main Dashboard ─── */
 export default function Dashboard() {
-    const [stats, setStats]     = useState(null);
+    const [stats, setStats] = useState(null);
+    const [recentConfigs, setRecentConfigs] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    const load = () => {
+    useEffect(() => {
         setLoading(true);
-        axios.get(`${API_URL}/api/configurations/stats`)
-            .then(r => { setStats(r.data); setLoading(false); })
-            .catch(() => setLoading(false));
-    };
+        Promise.all([
+            axios.get(`${API_URL}/api/configurations/stats`),
+            axios.get(`${API_URL}/api/configurations`, { params: { page: 1, limit: 5 } }),
+        ])
+            .then(([statsRes, recentRes]) => {
+                setStats(statsRes.data);
+                setRecentConfigs(recentRes.data.data);
+            })
+            .catch(() => {})
+            .finally(() => setLoading(false));
+    }, []);
 
-    useEffect(() => { load(); }, []);
-
-    const configs       = stats?.configs || [];
-    const avgPrice      = stats?.avg_price ?? 0;
+    const configs = stats?.configs || [];
+    const avgPrice = stats?.avg_price ?? 0;
     const mostExpensive = stats?.most_expensive;
-
-    // Sort by most recently updated/created and take top 5
-    const recentConfigs = [...configs]
-        .sort((a, b) => {
-            const dateA = new Date(a.updated_at || a.created_at);
-            const dateB = new Date(b.updated_at || b.created_at);
-            return dateB - dateA;
-        })
-        .slice(0, 5);
 
     const fmt = (v) => `₹${parseFloat(v).toLocaleString('en-IN')}`;
 
@@ -281,14 +278,14 @@ export default function Dashboard() {
                                 <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0 }}>Recent Configurations</h3>
                                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>Most recently created or updated</p>
                             </div>
-                            {configs.length > 0 && (
+                            {recentConfigs.length > 0 && (
                                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/builder')}>
                                     View All →
                                 </button>
                             )}
                         </div>
 
-                        {configs.length === 0 ? (
+                        {recentConfigs.length === 0 ? (
                             <div className="empty-state">
                                 <p className="text-muted" style={{ marginBottom: '1rem' }}>No configurations yet. Build your first bike!</p>
                                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/builder')}>

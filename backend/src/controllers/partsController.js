@@ -1,9 +1,13 @@
 const partsService = require('../services/partsService');
+const { parsePaginationQuery, sendPaginatedResponse } = require('../utils/pagination');
 
 class PartsController {
     async getAll(req, res) {
-        const parts = await partsService.getAllParts();
-        res.json(parts);
+        const { page, limit, offset, search } = parsePaginationQuery(req.query);
+        const category = (req.query.category || '').trim();
+
+        const result = await partsService.getParts({ page, limit, offset, search, category });
+        sendPaginatedResponse(res, result.data, result.pagination);
     }
 
     async create(req, res) {
@@ -22,8 +26,15 @@ class PartsController {
     }
 
     async getHistory(req, res) {
-        const history = await partsService.getPriceHistory(req.params.id);
-        res.json(history);
+        const { page, limit, offset, search } = parsePaginationQuery(req.query);
+
+        const result = await partsService.getPriceHistory(req.params.id, {
+            page,
+            limit,
+            offset,
+            search,
+        });
+        sendPaginatedResponse(res, result.data, result.pagination);
     }
 }
 

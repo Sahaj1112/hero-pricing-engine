@@ -1,42 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config/api';
+import Pagination from '../components/Pagination';
 
 const CATEGORIES = ['frame', 'gear', 'tyre', 'accessory'];
 const PAGE_SIZE = 10;
 
 const EMPTY_FORM = { name: '', category: 'frame', price: '', is_accessory: false };
-
-/* ─── Reusable Pagination component ─── */
-function Pagination({ total, page, onPage }) {
-    const totalPages = Math.ceil(total / PAGE_SIZE);
-    if (totalPages <= 1) return null;
-    const from = (page - 1) * PAGE_SIZE + 1;
-    const to = Math.min(page * PAGE_SIZE, total);
-    return (
-        <div className="pagination">
-            <span className="pagination-info">Showing {from}–{to} of {total}</span>
-            <div className="pagination-controls">
-                <button className="pagination-btn" onClick={() => onPage(1)} disabled={page === 1}>«</button>
-                <button className="pagination-btn" onClick={() => onPage(page - 1)} disabled={page === 1}>‹</button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                    .reduce((acc, p, i, arr) => {
-                        if (i > 0 && arr[i - 1] !== p - 1) acc.push('…');
-                        acc.push(p);
-                        return acc;
-                    }, [])
-                    .map((p, i) =>
-                        p === '…'
-                            ? <span key={`e${i}`} className="pagination-btn" style={{ border: 'none' }}>…</span>
-                            : <button key={p} className={`pagination-btn ${p === page ? 'active' : ''}`} onClick={() => onPage(p)}>{p}</button>
-                    )}
-                <button className="pagination-btn" onClick={() => onPage(page + 1)} disabled={page === totalPages}>›</button>
-                <button className="pagination-btn" onClick={() => onPage(totalPages)} disabled={page === totalPages}>»</button>
-            </div>
-        </div>
-    );
-}
 
 /* ─── Part Form Modal (Add / Edit) ─── */
 function PartFormModal({ initial, onClose, onSaved }) {
@@ -159,18 +129,13 @@ function DeleteModal({ part, onClose, onDeleted }) {
                 <div className="delete-confirm-body">
                     <div className="delete-icon">🗑️</div>
                     <h3>Delete Part?</h3>
-
                     <p>
                         Are you sure you want to delete <strong>"{part.name}"</strong>? This action cannot be undone.
                     </p>
-
                     <p className="delete-note">
                         <strong>Note:</strong> Deleting this part will automatically unlink it from all configurations where it is currently used.
                     </p>
-
-                    <p>
-                        Are you sure you want to proceed?
-                    </p>
+                    <p>Are you sure you want to proceed?</p>
                 </div>
                 <div className="modal-footer">
                     <button className="btn btn-secondary btn-sm" onClick={onClose} disabled={deleting}>Cancel</button>
@@ -186,16 +151,36 @@ function DeleteModal({ part, onClose, onDeleted }) {
 /* ─── Main Parts Page ─── */
 export default function Parts() {
     const [parts, setParts] = useState([]);
+    const [pagination, setPagination] = useState(null);
     const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState('');
     const [addOpen, setAddOpen] = useState(false);
     const [editPart, setEditPart] = useState(null);
     const [deletePart, setDeletePart] = useState(null);
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
+    const [refresh, setRefresh] = useState(0);
 
-    const load = () => axios.get(`${API_URL}/api/parts`).then(r => setParts(r.data));
-    useEffect(() => { load(); }, []);
+    const load = useCallback(async () => {
+        setLoading(true);
+        try {
+            const params = { page, limit: PAGE_SIZE };
+            if (search) params.search = search;
+            if (categoryFilter !== 'all') params.category = categoryFilter;
+
+            const res = await axios.get(`${API_URL}/api/parts`, { params });
+            setParts(res.data.data);
+            setPagination(res.data.pagination);
+        } catch {
+            setParts([]);
+            setPagination(null);
+        } finally {
+            setLoading(false);
+        }
+    }, [page, search, categoryFilter]);
+
+    useEffect(() => { load(); }, [load, refresh]);
 
     const showToast = (msg) => {
         setToast(msg);
@@ -205,37 +190,28 @@ export default function Parts() {
     const handleSaved = (msg) => {
         setAddOpen(false);
         setEditPart(null);
-        load();
+        setPage(1);
+        setRefresh(r => r + 1);
         showToast(msg);
     };
 
     const handleDeleted = (msg) => {
         setDeletePart(null);
-        load();
         setPage(1);
+        setRefresh(r => r + 1);
         showToast(msg);
     };
-
-    // Derived filtered list
-    const filtered = parts.filter(p => {
-        const matchName = p.name.toLowerCase().includes(search.toLowerCase());
-        const matchCat  = categoryFilter === 'all' || p.category === categoryFilter;
-        return matchName && matchCat;
-    });
 
     const handleSearch = (val) => { setSearch(val); setPage(1); };
     const handleCategoryFilter = (val) => { setCategoryFilter(val); setPage(1); };
 
-    const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const totalRecords = pagination?.totalRecords ?? 0;
+    const hasFilters = search || categoryFilter !== 'all';
 
     return (
         <div className="page-wrapper animate-fade-in">
-            {/* Toast notification */}
-            {toast && (
-                <div className="toast-notification">✓ {toast}</div>
-            )}
+            {toast && <div className="toast-notification">✓ {toast}</div>}
 
-            {/* Page Header */}
             <div className="page-header">
                 <div>
                     <h1>Parts Inventory</h1>
@@ -246,7 +222,6 @@ export default function Parts() {
                 </button>
             </div>
 
-            {/* Search & Filter Toolbar */}
             <div className="table-toolbar">
                 <div className="table-toolbar-search">
                     <span className="table-toolbar-icon">🔍</span>
@@ -272,14 +247,13 @@ export default function Parts() {
                         <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
                     ))}
                 </select>
-                {(search || categoryFilter !== 'all') && (
+                {hasFilters && pagination && (
                     <span className="table-toolbar-count">
-                        {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+                        {totalRecords} result{totalRecords !== 1 ? 's' : ''}
                     </span>
                 )}
             </div>
 
-            {/* Table */}
             <div className="data-table-wrapper" style={{ flex: 1 }}>
                 <table className="data-table">
                     <thead>
@@ -293,7 +267,13 @@ export default function Parts() {
                         </tr>
                     </thead>
                     <tbody>
-                        {paged.map((p, i) => (
+                        {loading ? (
+                            <tr>
+                                <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                                    Loading parts…
+                                </td>
+                            </tr>
+                        ) : parts.map((p, i) => (
                             <tr key={p.id}>
                                 <td className="text-muted" style={{ width: '3rem' }}>{(page - 1) * PAGE_SIZE + i + 1}</td>
                                 <td style={{ fontWeight: 500 }}>{p.name}</td>
@@ -310,10 +290,10 @@ export default function Parts() {
                                 </td>
                             </tr>
                         ))}
-                        {filtered.length === 0 && (
+                        {!loading && parts.length === 0 && (
                             <tr>
                                 <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                                    {parts.length === 0
+                                    {!hasFilters
                                         ? <>No parts yet. Click <strong>"+ Add New Part"</strong> to get started.</>
                                         : <>No parts match your search. <button className="btn-link" onClick={() => { handleSearch(''); handleCategoryFilter('all'); }}>Clear filters</button></>}
                                 </td>
@@ -321,10 +301,9 @@ export default function Parts() {
                         )}
                     </tbody>
                 </table>
-                <Pagination total={filtered.length} page={page} onPage={setPage} />
+                <Pagination pagination={pagination} onPage={setPage} loading={loading} />
             </div>
 
-            {/* Modals */}
             {addOpen && (
                 <PartFormModal onClose={() => setAddOpen(false)} onSaved={handleSaved} />
             )}
