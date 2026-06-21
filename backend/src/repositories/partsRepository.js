@@ -116,6 +116,19 @@ class PartsRepository {
         const result = await pool.query('SELECT COUNT(*)::int AS cnt FROM parts');
         return result.rows[0].cnt;
     }
+
+    async findByName(name, excludeId = null) {
+        let query = 'SELECT * FROM parts WHERE LOWER(name) = LOWER($1)';
+        const params = [name];
+        
+        if (excludeId) {
+            query += ' AND id != $2';
+            params.push(excludeId);
+        }
+        
+        const result = await pool.query(query, params);
+        return result.rows[0] || null;
+    }
 }
 
 module.exports = new PartsRepository();

@@ -489,8 +489,9 @@ function NewConfigModal({ onClose, onSaved }) {
             });
             onSaved();
             onClose();
-        } catch {
-            setApiError('Error saving configuration. Please try again.');
+        } catch (error) {
+            const message = error.response?.data?.error || 'Error saving configuration. Please try again.';
+            setApiError(message);
         } finally {
             setSaving(false);
         }
@@ -604,8 +605,9 @@ function EditConfigModal({ config, onClose, onSaved }) {
             });
             onSaved();
             onClose();
-        } catch {
-            setApiError('Error updating configuration. Please try again.');
+        } catch (error) {
+            const message = error.response?.data?.error || 'Error updating configuration. Please try again.';
+            setApiError(message);
         } finally {
             setSaving(false);
         }

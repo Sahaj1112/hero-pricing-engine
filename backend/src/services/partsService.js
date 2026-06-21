@@ -16,6 +16,10 @@ class PartsService {
     }
 
     async createPart(data) {
+        const existingPart = await partsRepository.findByName(data.name);
+        if (existingPart) {
+            throw new AppError('A part with this name already exists', 400);
+        }
         return partsRepository.create(data);
     }
 
@@ -23,6 +27,11 @@ class PartsService {
         const existing = await partsRepository.findPriceById(id);
         if (!existing) {
             throw new AppError('Part not found', 404);
+        }
+
+        const duplicateName = await partsRepository.findByName(data.name, id);
+        if (duplicateName) {
+            throw new AppError('A part with this name already exists', 400);
         }
 
         await partsRepository.recordPriceChange(id, existing.price, data.price);

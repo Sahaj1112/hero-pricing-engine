@@ -61,12 +61,22 @@ class ConfigurationsService {
     }
 
     async createConfiguration(data) {
+        const existingConfig = await configurationsRepository.findByName(data.name);
+        if (existingConfig) {
+            throw new AppError('A configuration with this name already exists', 400);
+        }
         return configurationsRepository.createWithParts(data);
     }
 
     async updateConfiguration(id, data) {
         const config = await configurationsRepository.findById(id);
         if (!config) throw new AppError('Not found', 404);
+        
+        const duplicateName = await configurationsRepository.findByName(data.name, id);
+        if (duplicateName) {
+            throw new AppError('A configuration with this name already exists', 400);
+        }
+        
         return configurationsRepository.updateWithParts(id, data);
     }
 

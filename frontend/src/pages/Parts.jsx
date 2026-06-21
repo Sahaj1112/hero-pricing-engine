@@ -40,8 +40,9 @@ function PartFormModal({ initial, onClose, onSaved }) {
                 await axios.post(`${API_URL}/api/parts`, form);
             }
             onSaved(isEdit ? 'Part updated successfully!' : 'Part added successfully!');
-        } catch {
-            setErrors({ submit: 'Something went wrong. Please try again.' });
+        } catch (error) {
+            const message = error.response?.data?.error || 'Something went wrong. Please try again.';
+            setErrors({ submit: message });
         } finally {
             setSaving(false);
         }

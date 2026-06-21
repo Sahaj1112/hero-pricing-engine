@@ -124,6 +124,19 @@ class ConfigurationsRepository {
     async delete(id) {
         await pool.query('DELETE FROM configurations WHERE id = $1', [id]);
     }
+
+    async findByName(name, excludeId = null) {
+        let query = 'SELECT * FROM configurations WHERE LOWER(name) = LOWER($1)';
+        const params = [name];
+        
+        if (excludeId) {
+            query += ' AND id != $2';
+            params.push(excludeId);
+        }
+        
+        const result = await pool.query(query, params);
+        return result.rows[0] || null;
+    }
 }
 
 module.exports = new ConfigurationsRepository();
