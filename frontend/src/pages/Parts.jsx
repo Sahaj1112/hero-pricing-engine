@@ -159,7 +159,18 @@ function DeleteModal({ part, onClose, onDeleted }) {
                 <div className="delete-confirm-body">
                     <div className="delete-icon">🗑️</div>
                     <h3>Delete Part?</h3>
-                    <p>Are you sure you want to delete <strong>"{part.name}"</strong>? This action cannot be undone.</p>
+
+                    <p>
+                        Are you sure you want to delete <strong>"{part.name}"</strong>? This action cannot be undone.
+                    </p>
+
+                    <p className="delete-note">
+                        <strong>Note:</strong> Deleting this part will automatically unlink it from all configurations where it is currently used.
+                    </p>
+
+                    <p>
+                        Are you sure you want to proceed?
+                    </p>
                 </div>
                 <div className="modal-footer">
                     <button className="btn btn-secondary btn-sm" onClick={onClose} disabled={deleting}>Cancel</button>

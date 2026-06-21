@@ -118,7 +118,7 @@ function BarChart({ configs }) {
 }
 
 /* ─── Stat Card ─── */
-function StatCard({ icon, label, value, sub, accent }) {
+function StatCard({ icon, label, value, sub, accent, onClick }) {
     const colors = {
         blue:   { bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6' },
         green:  { bg: 'rgba(16,185,129,0.12)',  color: '#10b981' },
@@ -127,8 +127,34 @@ function StatCard({ icon, label, value, sub, accent }) {
     };
     const c = colors[accent] || colors.blue;
 
+    const isClickable = typeof onClick === 'function';
+
     return (
-        <div className="card" style={{ padding: '1rem 1.125rem', display: 'flex', alignItems: 'center', gap: '0.875rem', transition: 'all 0.2s' }}>
+        <div
+            className="card"
+            onClick={onClick}
+            style={{
+                padding: '1rem 1.125rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.875rem',
+                transition: 'all 0.2s',
+                cursor: isClickable ? 'pointer' : 'default',
+                userSelect: 'none',
+            }}
+            onMouseEnter={e => {
+                if (isClickable) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)';
+                }
+            }}
+            onMouseLeave={e => {
+                if (isClickable) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '';
+                }
+            }}
+        >
             <div style={{
                 width: '2.75rem', height: '2.75rem', borderRadius: '0.625rem', flexShrink: 0,
                 background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -136,7 +162,7 @@ function StatCard({ icon, label, value, sub, accent }) {
             }}>
                 {icon}
             </div>
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
                     {label}
                 </div>
@@ -149,6 +175,9 @@ function StatCard({ icon, label, value, sub, accent }) {
                     </div>
                 )}
             </div>
+            {isClickable && (
+                <div style={{ color: c.color, fontSize: '1rem', flexShrink: 0, opacity: 0.7 }}>→</div>
+            )}
         </div>
     );
 }
@@ -169,16 +198,19 @@ export default function Dashboard() {
     useEffect(() => { load(); }, []);
 
     const configs       = stats?.configs || [];
-    const recent        = configs.slice(0, 2);
     const avgPrice      = stats?.avg_price ?? 0;
     const mostExpensive = stats?.most_expensive;
 
-    const fmt = (v) => `₹${parseFloat(v).toLocaleString('en-IN')}`;
+    // Sort by most recently updated/created and take top 5
+    const recentConfigs = [...configs]
+        .sort((a, b) => {
+            const dateA = new Date(a.updated_at || a.created_at);
+            const dateB = new Date(b.updated_at || b.created_at);
+            return dateB - dateA;
+        })
+        .slice(0, 5);
 
-    const fmtDate = (iso) => {
-        const d = new Date(iso);
-        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    };
+    const fmt = (v) => `₹${parseFloat(v).toLocaleString('en-IN')}`;
 
     return (
         <div className="page-wrapper animate-fade-in">
@@ -202,12 +234,14 @@ export default function Dashboard() {
                             label="Total Parts"
                             value={stats?.total_parts ?? 0}
                             accent="blue"
+                            onClick={() => navigate('/parts')}
                         />
                         <StatCard
                             icon="🚲"
                             label="Total Configurations"
                             value={stats?.total_configs ?? 0}
                             accent="green"
+                            onClick={() => navigate('/builder')}
                         />
                         <StatCard
                             icon="📊"
@@ -224,74 +258,19 @@ export default function Dashboard() {
                         />
                     </div>
 
-                    {/* ── Chart + Recent side-by-side (if enough space) ── */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1rem', marginBottom: '1.25rem' }}>
-
-                        {/* Bar Chart */}
-                        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
-                                <div>
-                                    <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0 }}>Configuration Price Analytics</h3>
-                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>Total price per configuration</p>
-                                </div>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.25rem 0.625rem', borderRadius: '9999px', fontWeight: 600 }}>
-                                    {configs.length} configs
-                                </span>
+                    {/* ── Bar Chart (full width) ── */}
+                    <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+                            <div>
+                                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0 }}>Configuration Price Analytics</h3>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>Total price per configuration</p>
                             </div>
-                            <div style={{ padding: '1rem 1.25rem 0.5rem' }}>
-                                <BarChart configs={configs} />
-                            </div>
+                            <span style={{ fontSize: '0.7rem', background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.25rem 0.625rem', borderRadius: '9999px', fontWeight: 600 }}>
+                                {configs.length} configs
+                            </span>
                         </div>
-
-                        {/* Category breakdown mini-card */}
-                        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                            <div style={{ padding: '0.875rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
-                                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0 }}>Price Range</h3>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>Across all configurations</p>
-                            </div>
-                            {configs.length === 0 ? (
-                                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-                                    No data yet
-                                </div>
-                            ) : (
-                                <div style={{ padding: '0.875rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-                                    {/* Min / Max / Avg */}
-                                    {[
-                                        { label: 'Highest Price', value: fmt(Math.max(...configs.map(c => parseFloat(c.total_price)))), color: '#3b82f6' },
-                                        { label: 'Lowest Price',  value: fmt(Math.min(...configs.map(c => parseFloat(c.total_price)))), color: '#10b981' },
-                                        { label: 'Average Price', value: fmt(avgPrice.toFixed(0)), color: '#8b5cf6' },
-                                    ].map(row => (
-                                        <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>{row.label}</span>
-                                            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: row.color, fontFamily: "'Outfit', sans-serif" }}>{row.value}</span>
-                                        </div>
-                                    ))}
-
-                                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.875rem', marginTop: '0.25rem' }}>
-                                        <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: '0.625rem' }}>
-                                            All Configs — Sorted by Price
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '130px', overflowY: 'auto' }}>
-                                            {[...configs]
-                                                .sort((a, b) => parseFloat(b.total_price) - parseFloat(a.total_price))
-                                                .map((c, i) => {
-                                                    const pct = (parseFloat(c.total_price) / Math.max(...configs.map(x => parseFloat(x.total_price)))) * 100;
-                                                    return (
-                                                        <div key={c.id}>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-main)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '55%' }}>{c.name}</span>
-                                                                <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>{fmt(c.total_price)}</span>
-                                                            </div>
-                                                            <div style={{ height: '4px', background: 'var(--border-color)', borderRadius: '9999px', overflow: 'hidden' }}>
-                                                                <div style={{ height: '100%', width: `${pct}%`, background: i === 0 ? '#3b82f6' : 'var(--primary-light)', borderRadius: '9999px', transition: 'width 0.6s ease' }} />
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                        <div style={{ padding: '1rem 1.25rem 0.5rem' }}>
+                            <BarChart configs={configs} />
                         </div>
                     </div>
 
@@ -300,9 +279,9 @@ export default function Dashboard() {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.875rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
                             <div>
                                 <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0 }}>Recent Configurations</h3>
-                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>Latest 2 entries</p>
+                                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>Most recently created or updated</p>
                             </div>
-                            {configs.length > 2 && (
+                            {configs.length > 0 && (
                                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/builder')}>
                                     View All →
                                 </button>
@@ -321,33 +300,19 @@ export default function Dashboard() {
                                 <thead>
                                     <tr>
                                         <th style={{ padding: '0.6rem 1.25rem' }}>Configuration Name</th>
-                                        <th style={{ padding: '0.6rem 1.25rem' }}>Parts</th>
-                                        <th style={{ padding: '0.6rem 1.25rem' }}>Total Price</th>
-                                        <th style={{ padding: '0.6rem 1.25rem' }}>Created</th>
-                                        <th style={{ padding: '0.6rem 1.25rem', textAlign: 'right' }}>Action</th>
+                                        <th style={{ padding: '0.6rem 1.25rem', textAlign: 'right' }}>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {recent.map(c => (
+                                    {recentConfigs.map(c => (
                                         <tr key={c.id}>
-                                            <td style={{ padding: '0.7rem 1.25rem', fontWeight: 600 }}>
+                                            <td style={{ padding: '0.75rem 1.25rem', fontWeight: 600 }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                     <span style={{ fontSize: '1rem' }}>🚲</span>
                                                     {c.name}
                                                 </div>
                                             </td>
-                                            <td style={{ padding: '0.7rem 1.25rem' }}>
-                                                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.625rem' }}>
-                                                    {c.part_count}
-                                                </span>
-                                            </td>
-                                            <td style={{ padding: '0.7rem 1.25rem', fontWeight: 700, color: 'var(--primary)', fontFamily: "'Outfit', sans-serif" }}>
-                                                {fmt(c.total_price)}
-                                            </td>
-                                            <td style={{ padding: '0.7rem 1.25rem', color: 'var(--text-muted)', fontSize: '0.775rem' }}>
-                                                {fmtDate(c.created_at)}
-                                            </td>
-                                            <td style={{ padding: '0.7rem 1.25rem', textAlign: 'right' }}>
+                                            <td style={{ padding: '0.75rem 1.25rem', textAlign: 'right' }}>
                                                 <button
                                                     className="btn btn-secondary btn-sm"
                                                     onClick={() => navigate(`/config/${c.id}`)}

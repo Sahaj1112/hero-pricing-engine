@@ -131,22 +131,6 @@ export default function ConfigView() {
                     </tfoot>
                 </table>
 
-                {/* Footer actions */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    gap: '0.625rem',
-                    padding: '0.75rem 1.25rem',
-                    borderTop: '1px solid var(--border-color)',
-                    background: 'rgba(0,0,0,0.01)',
-                }}>
-                    <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
-                        🖨️ Print Quote
-                    </button>
-                    <button className="btn btn-primary btn-sm" onClick={() => navigate('/builder')}>
-                        + New Configuration
-                    </button>
-                </div>
             </div>
         </div>
     );
