@@ -55,6 +55,12 @@ class ConfigurationsService {
         return configurationsRepository.createWithParts(data);
     }
 
+    async updateConfiguration(id, data) {
+        const config = await configurationsRepository.findById(id);
+        if (!config) throw new AppError('Not found', 404);
+        return configurationsRepository.updateWithParts(id, data);
+    }
+
     async deleteConfiguration(id) {
         await configurationsRepository.delete(id);
         return { message: 'Configuration deleted' };

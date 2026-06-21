@@ -3,16 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_URL } from '../config/api';
 
-const CATEGORIES = [
-    { key: 'frame',     label: 'Frame',     icon: '🔩' },
-    { key: 'gear',      label: 'Gear',      icon: '⚙️' },
-    { key: 'tyre',      label: 'Tyre',      icon: '🔘' },
-    { key: 'accessory', label: 'Accessory', icon: '🪛' },
+/* Required part categories (frame/gear/tyre) */
+const REQUIRED_CATEGORIES = [
+    { key: 'frame', label: 'Frame', icon: '🔩' },
+    { key: 'gear',  label: 'Gear',  icon: '⚙️' },
+    { key: 'tyre',  label: 'Tyre',  icon: '🔘' },
 ];
 
 const PAGE_SIZE = 10;
 
-/* ─── Searchable Select Dropdown ─── */
+/* ─── Searchable Single-Select Dropdown (for required parts) ─── */
 function CategorySelect({ category, parts, value, onChange, hasError }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -26,7 +26,9 @@ function CategorySelect({ category, parts, value, onChange, hasError }) {
     const selected = parts.find(p => p.id === value) || null;
 
     useEffect(() => {
-        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        const handler = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
@@ -89,6 +91,176 @@ function CategorySelect({ category, parts, value, onChange, hasError }) {
     );
 }
 
+/* ─── Accessory Multi-Select with search + tag chips ─── */
+function AccessoryMultiSelect({ parts, selectedIds, onChange }) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const ref = useRef(null);
+    const inputRef = useRef(null);
+
+    const accessories = parts.filter(p => p.category === 'accessory');
+    const filtered = accessories.filter(p =>
+        p.name.toLowerCase().includes(search.toLowerCase())
+    );
+
+    const selectedParts = accessories.filter(p => selectedIds.includes(p.id));
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const openDropdown = () => {
+        setOpen(true);
+        setSearch('');
+        setTimeout(() => inputRef.current?.focus(), 50);
+    };
+
+    const toggle = (part) => {
+        if (selectedIds.includes(part.id)) {
+            onChange(selectedIds.filter(id => id !== part.id));
+        } else {
+            onChange([...selectedIds, part.id]);
+        }
+    };
+
+    const remove = (e, id) => {
+        e.stopPropagation();
+        onChange(selectedIds.filter(sid => sid !== id));
+    };
+
+    return (
+        <div className="cat-select" ref={ref}>
+            {/* Trigger */}
+            <div
+                className={`cat-select-trigger ${open ? 'focused' : ''} ${selectedParts.length > 0 ? 'has-value' : ''}`}
+                onClick={openDropdown}
+                style={{ height: 'auto', minHeight: '2.375rem', flexWrap: 'wrap', gap: '0.3rem', padding: selectedParts.length ? '0.3rem 0.5rem' : undefined }}
+            >
+                <span className="cat-select-label" style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
+                    {selectedParts.length === 0 ? (
+                        <span className="cat-select-placeholder">Select Accessories… (optional)</span>
+                    ) : (
+                        selectedParts.map(p => (
+                            <span
+                                key={p.id}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    background: 'var(--primary-light)',
+                                    color: 'var(--primary)',
+                                    borderRadius: '9999px',
+                                    padding: '0.15rem 0.5rem 0.15rem 0.625rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                {p.name}
+                                <button
+                                    onClick={(e) => remove(e, p.id)}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: 'var(--primary)',
+                                        padding: '0',
+                                        lineHeight: 1,
+                                        fontSize: '0.7rem',
+                                        fontWeight: 700,
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                            </span>
+                        ))
+                    )}
+                </span>
+                <span className="cat-select-actions">
+                    <span className="cat-chevron">{open ? '▲' : '▼'}</span>
+                </span>
+            </div>
+
+            {/* Dropdown */}
+            {open && (
+                <div className="cat-dropdown" style={{ zIndex: 1100 }}>
+                    <div className="cat-search-wrap">
+                        <input
+                            ref={inputRef}
+                            className="cat-search-input"
+                            placeholder="Search accessories…"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div className="cat-options">
+                        {accessories.length === 0 ? (
+                            <div className="cat-option-empty">No accessories available</div>
+                        ) : filtered.length === 0 ? (
+                            <div className="cat-option-empty">No matches found</div>
+                        ) : (
+                            filtered.map(p => {
+                                const isSelected = selectedIds.includes(p.id);
+                                return (
+                                    <div
+                                        key={p.id}
+                                        className={`cat-option ${isSelected ? 'active' : ''}`}
+                                        onClick={() => toggle(p)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                    >
+                                        {/* Checkbox visual */}
+                                        <span style={{
+                                            width: '1rem',
+                                            height: '1rem',
+                                            borderRadius: '0.25rem',
+                                            border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}`,
+                                            background: isSelected ? 'var(--primary)' : 'transparent',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0,
+                                            fontSize: '0.6rem',
+                                            color: 'white',
+                                            transition: 'all 0.15s',
+                                        }}>
+                                            {isSelected && '✓'}
+                                        </span>
+                                        <span className="cat-option-name">{p.name}</span>
+                                        <span className="cat-option-price">₹{parseFloat(p.price).toLocaleString('en-IN')}</span>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                    {selectedIds.length > 0 && (
+                        <div style={{
+                            padding: '0.5rem 0.75rem',
+                            borderTop: '1px solid var(--border-color)',
+                            fontSize: '0.75rem',
+                            color: 'var(--text-muted)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}>
+                            <span>{selectedIds.length} selected</span>
+                            <button
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.75rem', fontWeight: 600 }}
+                                onClick={(e) => { e.stopPropagation(); onChange([]); }}
+                            >
+                                Clear all
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 /* ─── Compact Pagination ─── */
 function Pagination({ total, page, onPage }) {
     const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -109,50 +281,187 @@ function Pagination({ total, page, onPage }) {
     );
 }
 
-/* ─── New Configuration Modal ─── */
-function NewConfigModal({ parts, onClose, onSaved }) {
-    const [name, setName]           = useState('');
-    const [desc, setDesc]           = useState('');
-    const [selections, setSelections] = useState({ frame: null, gear: null, tyre: null, accessory: null });
-    const [nameError, setNameError] = useState('');
-    const [catErrors, setCatErrors] = useState({});
-    const [saving, setSaving]       = useState(false);
-    const [apiError, setApiError]   = useState('');
-
+/* ─── Shared Config Form Body ─── */
+function ConfigFormBody({
+    parts,
+    name, setName,
+    desc, setDesc,
+    selections, setSelections,
+    selectedAccessories, setSelectedAccessories,
+    nameError, setNameError,
+    catErrors, setCatErrors,
+}) {
     const selectPart = (cat, part) => {
         setSelections(prev => ({ ...prev, [cat]: part ? part.id : null }));
-        // Clear individual category error when user picks
-        if (catErrors[cat]) {
-            setCatErrors(prev => ({ ...prev, [cat]: false }));
-        }
+        if (catErrors[cat]) setCatErrors(prev => ({ ...prev, [cat]: false }));
     };
 
-    const selectedParts = parts.filter(p => Object.values(selections).includes(p.id));
-    const total = selectedParts.reduce((s, p) => s + parseFloat(p.price), 0);
+    // Price preview: required parts + accessories
+    const requiredSelected = parts.filter(p =>
+        REQUIRED_CATEGORIES.some(cat => selections[cat.key] === p.id)
+    );
+    const accessorySelected = parts.filter(p =>
+        p.category === 'accessory' && selectedAccessories.includes(p.id)
+    );
+    const allSelectedParts = [...requiredSelected, ...accessorySelected];
+    const total = allSelectedParts.reduce((s, p) => s + parseFloat(p.price), 0);
 
-    const save = async () => {
+    const missedRequired = REQUIRED_CATEGORIES.filter(cat => !selections[cat.key]).length;
+
+    return (
+        <>
+            {/* Config Details */}
+            <div style={{ marginBottom: '1.25rem' }}>
+                <div className="builder-section-header" style={{ marginBottom: '0.625rem' }}>
+                    Configuration Details
+                </div>
+                <div className="builder-two-col">
+                    <div>
+                        <label className="form-label" style={{ marginBottom: '0.3rem' }}>
+                            Name<span className="required-star">*</span>
+                        </label>
+                        <input
+                            id="config-name-input"
+                            className={`form-input form-input-sm ${nameError ? 'input-error' : ''}`}
+                            placeholder="e.g. Road Racer Pro"
+                            value={name}
+                            onChange={e => { setName(e.target.value); if (nameError) setNameError(''); }}
+                            autoFocus
+                        />
+                        {nameError && <span className="form-error-inline">{nameError}</span>}
+                    </div>
+                    <div>
+                        <label className="form-label" style={{ marginBottom: '0.3rem' }}>
+                            Description{' '}
+                            <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.75rem' }}>(Optional)</span>
+                        </label>
+                        <input
+                            id="config-desc-input"
+                            className="form-input form-input-sm"
+                            placeholder="Brief description"
+                            value={desc}
+                            onChange={e => setDesc(e.target.value)}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Divider */}
+            <div className="builder-divider" style={{ margin: '0 0 1.25rem' }} />
+
+            {/* Required Parts */}
+            <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
+                    <div className="builder-section-header" style={{ margin: 0 }}>
+                        Select Parts<span className="required-star">*</span>
+                    </div>
+                    {missedRequired > 0 && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {3 - missedRequired}/3 selected
+                        </span>
+                    )}
+                </div>
+
+                <div className="builder-parts-2x2">
+                    {REQUIRED_CATEGORIES.map(cat => (
+                        <div key={cat.key} className="builder-cat-cell">
+                            <label className={`builder-cat-cell-label ${catErrors[cat.key] ? 'builder-cat-label-error' : ''}`}>
+                                <span>{cat.icon}</span> {cat.label}
+                                <span className="required-star">*</span>
+                            </label>
+                            <CategorySelect
+                                category={cat}
+                                parts={parts}
+                                value={selections[cat.key]}
+                                onChange={(part) => selectPart(cat.key, part)}
+                                hasError={!!catErrors[cat.key]}
+                            />
+                            {catErrors[cat.key] && (
+                                <span className="form-error-inline">Please select a {cat.label.toLowerCase()}.</span>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Divider */}
+            <div className="builder-divider" style={{ margin: '0 0 1.25rem' }} />
+
+            {/* Accessories (Optional) */}
+            <div style={{ marginBottom: '1rem' }}>
+                <div style={{ marginBottom: '0.625rem' }}>
+                    <div className="builder-section-header" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span>🪛</span> Accessories
+                        <span style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            color: 'var(--secondary)',
+                            background: 'rgba(16,185,129,0.1)',
+                            borderRadius: '9999px',
+                            padding: '0.1rem 0.5rem',
+                        }}>
+                            Optional
+                        </span>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        Choose zero, one, or multiple accessories to include.
+                    </p>
+                </div>
+                <AccessoryMultiSelect
+                    parts={parts}
+                    selectedIds={selectedAccessories}
+                    onChange={setSelectedAccessories}
+                />
+            </div>
+
+            {/* Price preview */}
+            {allSelectedParts.length > 0 && (
+                <div className="modal-price-preview">
+                    <span className="modal-price-preview-label">Estimated Total</span>
+                    <span className="modal-price-preview-value">₹{total.toLocaleString('en-IN')}</span>
+                </div>
+            )}
+        </>
+    );
+}
+
+/* ─── New Configuration Modal ─── */
+function NewConfigModal({ parts, onClose, onSaved }) {
+    const [name, setName] = useState('');
+    const [desc, setDesc] = useState('');
+    const [selections, setSelections] = useState({ frame: null, gear: null, tyre: null });
+    const [selectedAccessories, setSelectedAccessories] = useState([]);
+    const [nameError, setNameError] = useState('');
+    const [catErrors, setCatErrors] = useState({});
+    const [saving, setSaving] = useState(false);
+    const [apiError, setApiError] = useState('');
+
+    const validate = () => {
         let valid = true;
         const newCatErrors = {};
-
         if (!name.trim()) { setNameError('Configuration name is required.'); valid = false; }
-
-        CATEGORIES.forEach(cat => {
-            if (!selections[cat.key]) {
-                newCatErrors[cat.key] = true;
-                valid = false;
-            }
+        REQUIRED_CATEGORIES.forEach(cat => {
+            if (!selections[cat.key]) { newCatErrors[cat.key] = true; valid = false; }
         });
-
         setCatErrors(newCatErrors);
-        if (!valid) return;
+        return valid;
+    };
 
+    const save = async () => {
+        if (!validate()) return;
         setSaving(true);
         setApiError('');
         try {
+            const part_ids = [
+                ...Object.values(selections).filter(Boolean),
+                ...selectedAccessories,
+            ];
             await axios.post(`${API_URL}/api/configurations`, {
                 name: name.trim(),
                 description: desc,
-                part_ids: Object.values(selections).filter(Boolean),
+                part_ids,
             });
             onSaved();
             onClose();
@@ -163,17 +472,9 @@ function NewConfigModal({ parts, onClose, onSaved }) {
         }
     };
 
-    // Close on overlay click
-    const handleOverlayClick = (e) => {
-        if (e.target === e.currentTarget) onClose();
-    };
-
-    const missedCount = CATEGORIES.filter(cat => !selections[cat.key]).length;
-
     return (
-        <div className="modal-overlay" onClick={handleOverlayClick}>
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
             <div className="modal-dialog modal-dialog-lg" onClick={e => e.stopPropagation()}>
-                {/* Header */}
                 <div className="modal-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                         <span style={{ fontSize: '1.25rem' }}>🚲</span>
@@ -181,102 +482,20 @@ function NewConfigModal({ parts, onClose, onSaved }) {
                     </div>
                     <button className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
                 </div>
-
-                {/* Body */}
                 <div className="modal-body" style={{ padding: '1.25rem 1.5rem' }}>
-
-                    {/* Config Details */}
-                    <div style={{ marginBottom: '1.25rem' }}>
-                        <div className="builder-section-header" style={{ marginBottom: '0.625rem' }}>
-                            Configuration Details
-                        </div>
-                        <div className="builder-two-col">
-                            <div>
-                                <label className="form-label" style={{ marginBottom: '0.3rem' }}>
-                                    Name<span className="required-star">*</span>
-                                </label>
-                                <input
-                                    id="config-name-input"
-                                    className={`form-input form-input-sm ${nameError ? 'input-error' : ''}`}
-                                    placeholder="e.g. Road Racer Pro"
-                                    value={name}
-                                    onChange={e => { setName(e.target.value); if (nameError) setNameError(''); }}
-                                    autoFocus
-                                />
-                                {nameError && <span className="form-error-inline">{nameError}</span>}
-                            </div>
-                            <div>
-                                <label className="form-label" style={{ marginBottom: '0.3rem' }}>
-                                    Description{' '}
-                                    <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.75rem' }}>(Optional)</span>
-                                </label>
-                                <input
-                                    id="config-desc-input"
-                                    className="form-input form-input-sm"
-                                    placeholder="Brief description"
-                                    value={desc}
-                                    onChange={e => setDesc(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="builder-divider" style={{ margin: '0 0 1.25rem' }} />
-
-                    {/* Select Parts */}
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
-                            <div className="builder-section-header" style={{ margin: 0 }}>
-                                Select Parts<span className="required-star">*</span>
-                            </div>
-                            {missedCount > 0 && (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    {4 - missedCount}/4 selected
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="builder-parts-2x2">
-                            {CATEGORIES.map(cat => (
-                                <div key={cat.key} className="builder-cat-cell">
-                                    <label className={`builder-cat-cell-label ${catErrors[cat.key] ? 'builder-cat-label-error' : ''}`}>
-                                        <span>{cat.icon}</span> {cat.label}
-                                        <span className="required-star">*</span>
-                                    </label>
-                                    <CategorySelect
-                                        category={cat}
-                                        parts={parts}
-                                        value={selections[cat.key]}
-                                        onChange={(part) => selectPart(cat.key, part)}
-                                        hasError={!!catErrors[cat.key]}
-                                    />
-                                    {catErrors[cat.key] && (
-                                        <span className="form-error-inline">Please select a {cat.label.toLowerCase()}.</span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Price preview inside modal */}
-                        {selectedParts.length > 0 && (
-                            <div className="modal-price-preview">
-                                <span className="modal-price-preview-label">Estimated Total</span>
-                                <span className="modal-price-preview-value">₹{total.toLocaleString('en-IN')}</span>
-                            </div>
-                        )}
-
-                        {apiError && (
-                            <div className="form-error" style={{ marginTop: '0.75rem', fontSize: '0.8125rem' }}>{apiError}</div>
-                        )}
-                    </div>
+                    <ConfigFormBody
+                        parts={parts}
+                        name={name} setName={setName}
+                        desc={desc} setDesc={setDesc}
+                        selections={selections} setSelections={setSelections}
+                        selectedAccessories={selectedAccessories} setSelectedAccessories={setSelectedAccessories}
+                        nameError={nameError} setNameError={setNameError}
+                        catErrors={catErrors} setCatErrors={setCatErrors}
+                    />
+                    {apiError && <div className="form-error" style={{ marginTop: '0.75rem', fontSize: '0.8125rem' }}>{apiError}</div>}
                 </div>
-
-                {/* Footer */}
                 <div className="modal-footer">
-                    <button className="btn btn-secondary" onClick={onClose} disabled={saving}>
-                        Cancel
-                    </button>
+                    <button className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
                     <button
                         id="save-configuration-btn"
                         className="btn btn-primary"
@@ -292,13 +511,161 @@ function NewConfigModal({ parts, onClose, onSaved }) {
     );
 }
 
+/* ─── Edit Configuration Modal ─── */
+function EditConfigModal({ config, parts, onClose, onSaved }) {
+    const [name, setName] = useState(config.name);
+    const [desc, setDesc] = useState(config.description || '');
+    const [selections, setSelections] = useState({ frame: null, gear: null, tyre: null });
+    const [selectedAccessories, setSelectedAccessories] = useState([]);
+    const [nameError, setNameError] = useState('');
+    const [catErrors, setCatErrors] = useState({});
+    const [saving, setSaving] = useState(false);
+    const [apiError, setApiError] = useState('');
+    const [loadingParts, setLoadingParts] = useState(true);
+
+    // Pre-populate selections from saved config
+    useEffect(() => {
+        axios.get(`${API_URL}/api/configurations/${config.id}`)
+            .then(r => {
+                const configParts = r.data.parts || [];
+                const newSel = { frame: null, gear: null, tyre: null };
+                const accIds = [];
+                configParts.forEach(p => {
+                    if (p.category === 'accessory') {
+                        accIds.push(p.id);
+                    } else if (newSel.hasOwnProperty(p.category)) {
+                        newSel[p.category] = p.id;
+                    }
+                });
+                setSelections(newSel);
+                setSelectedAccessories(accIds);
+            })
+            .catch(() => { })
+            .finally(() => setLoadingParts(false));
+    }, [config.id]);
+
+    const validate = () => {
+        let valid = true;
+        const newCatErrors = {};
+        if (!name.trim()) { setNameError('Configuration name is required.'); valid = false; }
+        REQUIRED_CATEGORIES.forEach(cat => {
+            if (!selections[cat.key]) { newCatErrors[cat.key] = true; valid = false; }
+        });
+        setCatErrors(newCatErrors);
+        return valid;
+    };
+
+    const save = async () => {
+        if (!validate()) return;
+        setSaving(true);
+        setApiError('');
+        try {
+            const part_ids = [
+                ...Object.values(selections).filter(Boolean),
+                ...selectedAccessories,
+            ];
+            await axios.put(`${API_URL}/api/configurations/${config.id}`, {
+                name: name.trim(),
+                description: desc,
+                part_ids,
+            });
+            onSaved();
+            onClose();
+        } catch {
+            setApiError('Error updating configuration. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+            <div className="modal-dialog modal-dialog-lg" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                        <span style={{ fontSize: '1.25rem' }}>✏️</span>
+                        <h3>Edit Configuration</h3>
+                    </div>
+                    <button className="modal-close-btn" onClick={onClose} aria-label="Close">✕</button>
+                </div>
+                <div className="modal-body" style={{ padding: '1.25rem 1.5rem' }}>
+                    {loadingParts ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading…</div>
+                    ) : (
+                        <ConfigFormBody
+                            parts={parts}
+                            name={name} setName={setName}
+                            desc={desc} setDesc={setDesc}
+                            selections={selections} setSelections={setSelections}
+                            selectedAccessories={selectedAccessories} setSelectedAccessories={setSelectedAccessories}
+                            nameError={nameError} setNameError={setNameError}
+                            catErrors={catErrors} setCatErrors={setCatErrors}
+                        />
+                    )}
+                    {apiError && <div className="form-error" style={{ marginTop: '0.75rem', fontSize: '0.8125rem' }}>{apiError}</div>}
+                </div>
+                <div className="modal-footer">
+                    <button className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button
+                        className="btn btn-primary"
+                        onClick={save}
+                        disabled={saving || loadingParts}
+                        style={{ minWidth: '9rem' }}
+                    >
+                        {saving ? 'Saving…' : '💾 Save Changes'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ─── Delete Confirmation Modal ─── */
+function DeleteConfigModal({ config, onClose, onDeleted }) {
+    const [deleting, setDeleting] = useState(false);
+
+    const confirm = async () => {
+        setDeleting(true);
+        try {
+            await axios.delete(`${API_URL}/api/configurations/${config.id}`);
+            onDeleted('Configuration deleted successfully.');
+        } catch {
+            onClose();
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-dialog modal-dialog-sm" onClick={e => e.stopPropagation()}>
+                <div className="delete-confirm-body">
+                    <div className="delete-icon">🗑️</div>
+                    <h3>Delete Configuration?</h3>
+                    <p>
+                        Are you sure you want to delete <strong>"{config.name}"</strong>? This action cannot be undone.
+                    </p>
+                </div>
+                <div className="modal-footer">
+                    <button className="btn btn-secondary btn-sm" onClick={onClose} disabled={deleting}>Cancel</button>
+                    <button className="btn btn-danger btn-sm" onClick={confirm} disabled={deleting}>
+                        {deleting ? 'Deleting…' : 'Yes, Delete'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /* ─── Main ConfigBuilder ─── */
 export default function ConfigBuilder() {
-    const [parts, setParts]       = useState([]);
-    const [configs, setConfigs]   = useState([]);
+    const [parts, setParts] = useState([]);
+    const [configs, setConfigs] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
+    const [editConfig, setEditConfig] = useState(null);
+    const [deleteConfig, setDeleteConfig] = useState(null);
     const [configPage, setConfigPage] = useState(1);
-    const [toast, setToast]       = useState('');
+    const [toast, setToast] = useState('');
     const navigate = useNavigate();
 
     const loadData = () => {
@@ -316,18 +683,49 @@ export default function ConfigBuilder() {
         showToast('Configuration saved successfully!');
     };
 
+    const handleUpdated = () => {
+        loadData();
+        showToast('Configuration updated successfully!');
+    };
+
+    const handleDeleted = (msg) => {
+        loadData();
+        setDeleteConfig(null);
+        setConfigPage(1);
+        showToast(msg);
+    };
+
     const pagedConfigs = configs.slice((configPage - 1) * PAGE_SIZE, configPage * PAGE_SIZE);
 
     return (
         <div className="page-wrapper animate-fade-in">
             {toast && <div className="toast-notification">✓ {toast}</div>}
 
-            {/* Modal */}
+            {/* New Config Modal */}
             {modalOpen && (
                 <NewConfigModal
                     parts={parts}
                     onClose={() => setModalOpen(false)}
                     onSaved={handleSaved}
+                />
+            )}
+
+            {/* Edit Config Modal */}
+            {editConfig && (
+                <EditConfigModal
+                    config={editConfig}
+                    parts={parts}
+                    onClose={() => setEditConfig(null)}
+                    onSaved={handleUpdated}
+                />
+            )}
+
+            {/* Delete Config Modal */}
+            {deleteConfig && (
+                <DeleteConfigModal
+                    config={deleteConfig}
+                    onClose={() => setDeleteConfig(null)}
+                    onDeleted={handleDeleted}
                 />
             )}
 
@@ -369,10 +767,10 @@ export default function ConfigBuilder() {
                         <table className="data-table" style={{ fontSize: '0.8125rem' }}>
                             <thead>
                                 <tr>
-                                    <th>#</th>
+                                    <th style={{ width: '2.5rem' }}>#</th>
                                     <th>Name</th>
                                     <th>Description</th>
-                                    <th style={{ textAlign: 'right' }}>Action</th>
+                                    <th style={{ textAlign: 'right' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -384,12 +782,27 @@ export default function ConfigBuilder() {
                                         <td style={{ fontWeight: 600 }}>{c.name}</td>
                                         <td className="text-muted">{c.description || <em>—</em>}</td>
                                         <td style={{ textAlign: 'right' }}>
-                                            <button
-                                                className="btn btn-secondary btn-sm"
-                                                onClick={() => navigate(`/config/${c.id}`)}
-                                            >
-                                                View →
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    onClick={() => navigate(`/config/${c.id}`)}
+                                                >
+                                                    View →
+                                                </button>
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    style={{ color: 'var(--primary)' }}
+                                                    onClick={() => setEditConfig(c)}
+                                                >
+                                                    ✏️ Edit
+                                                </button>
+                                                <button
+                                                    className="btn btn-danger btn-sm"
+                                                    onClick={() => setDeleteConfig(c)}
+                                                >
+                                                    🗑️ Delete
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

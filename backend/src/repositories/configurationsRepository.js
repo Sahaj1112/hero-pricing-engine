@@ -68,6 +68,34 @@ class ConfigurationsRepository {
         }
     }
 
+    async updateWithParts(id, { name, description, partIds }) {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            const config = await client.query(
+                'UPDATE configurations SET name = $1, description = $2 WHERE id = $3 RETURNING *',
+                [name, description, id]
+            );
+            if (config.rows.length === 0) throw new Error('Not found');
+
+            await client.query('DELETE FROM config_parts WHERE config_id = $1', [id]);
+            for (const partId of partIds) {
+                await client.query(
+                    'INSERT INTO config_parts (config_id, part_id) VALUES ($1, $2)',
+                    [id, partId]
+                );
+            }
+
+            await client.query('COMMIT');
+            return config.rows[0];
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
+
     async delete(id) {
         await pool.query('DELETE FROM configurations WHERE id = $1', [id]);
     }
