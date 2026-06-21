@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const NAV_ITEMS = [
     { to: '/dashboard', icon: '📊', label: 'Dashboard' },
@@ -8,15 +8,8 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
-    const navigate  = useNavigate();
     const location  = useLocation();
-    const user      = JSON.parse(localStorage.getItem('user') || '{}');
     const [isCollapsed, setIsCollapsed] = useState(false);
-
-    const logout = () => {
-        localStorage.clear();
-        navigate('/login');
-    };
 
     const toggleSidebar = (e) => {
         if (e) e.stopPropagation();
@@ -61,28 +54,17 @@ export default function Sidebar() {
                 ))}
             </nav>
 
-            {/* Footer — user + logout */}
+            {/* Footer — user info */}
             <div className="sidebar-footer">
                 <div className="user-profile-sidebar">
-                    <div className="avatar">
-                        {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
-                    </div>
+                    <div className="avatar">A</div>
                     {!isCollapsed && (
                         <div className="user-info">
-                            <span className="username">{user.username}</span>
-                            <span className="role">Admin</span>
+                            <span className="username">Admin</span>
+                            <span className="role">Hero Cycles</span>
                         </div>
                     )}
                 </div>
-
-                <button
-                    onClick={logout}
-                    className="btn btn-secondary w-full sidebar-logout-btn"
-                    title="Logout"
-                >
-                    <span className="link-icon">🚪</span>
-                    {!isCollapsed && <span className="link-text">Logout</span>}
-                </button>
             </div>
         </aside>
     );

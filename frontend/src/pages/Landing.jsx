@@ -15,8 +15,8 @@ export default function Landing() {
                         The ultimate sales portal for Hero Cycles. Configure custom builds, calculate margins instantly, and generate quotes in seconds.
                     </p>
                     <div className="hero-actions">
-                        <Link to="/login" className="btn btn-primary btn-lg">
-                            Login to Portal
+                        <Link to="/dashboard" className="btn btn-primary btn-lg">
+                            Open App
                         </Link>
                         <a href="#features" className="btn btn-secondary btn-lg">
                             Learn More
