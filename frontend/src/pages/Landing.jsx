@@ -23,21 +23,6 @@ export default function Landing() {
                         </a>
                     </div>
                 </div>
-                <div className="hero-visual">
-                    <div className="hero-card card">
-                        <div className="skeleton-line" style={{ width: '60%' }}></div>
-                        <div className="skeleton-line" style={{ width: '80%' }}></div>
-                        <div className="skeleton-line" style={{ width: '40%' }}></div>
-                        <div className="skeleton-box mt-4"></div>
-                        <div className="skeleton-box" style={{ height: '100px' }}></div>
-                        <div className="flex justify-between mt-4">
-                            <div className="skeleton-line" style={{ width: '30%' }}></div>
-                            <div className="skeleton-btn"></div>
-                        </div>
-                    </div>
-                    <div className="hero-decoration dec-1"></div>
-                    <div className="hero-decoration dec-2"></div>
-                </div>
             </div>
 
             <section id="features" className="features-section">
